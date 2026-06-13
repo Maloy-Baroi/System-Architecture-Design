@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ১৩: CAP Theorem, Consistency Models, Leader Election, Consensus, Paxos ও Raft — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html" class="active"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ১৩
+      </div>
+      <div class="page-nav">
+        <a href="chapter-12.html">← আগের অধ্যায়</a>
+        <a href="chapter-14.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ১৩</div>
+      <h1>অধ্যায় ১৩: CAP Theorem, Consistency Models, Leader Election, Consensus, Paxos ও Raft</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>এই অধ্যায়টি পুরো বইয়ের তাত্ত্বিকভাবে সবচেয়ে গভীর এবং সম্ভবত সবচেয়ে গুরুত্বপূর্ণ অধ্যায়। এতদিন আমরা ডাটা একাধিক জায়গায় রাখার (replication), ভাগ করার (sharding), এবং ব্যর্থতা সামলানোর (failover) কথা বলেছি। কিন্তু একটি মৌলিক প্রশ্ন এড়িয়ে গেছি: যখন একই ডাটা একাধিক মেশিনে থাকে, তখন সেগুলো একে অপরের সাথে <strong>একমত (agree)</strong> থাকবে কীভাবে?</p>
+<p>কল্পনা করুন আপনার ব্যাংক ব্যালেন্স তিনটি সার্ভারে রাখা আছে। আপনি ১০০ টাকা তুললেন। এক সার্ভার আপডেট হলো, কিন্তু নেটওয়ার্ক সমস্যায় বাকি দুটো হলো না। এখন আপনার ব্যালেন্স কত? কোন সার্ভার "সত্য" বলছে? দুটি সার্ভার যদি একই সাথে দুটি ভিন্ন লেনদেন গ্রহণ করে, কোনটি আগে? — এই প্রশ্নগুলোর উত্তর দেওয়াই distributed systems-এর কেন্দ্রীয় চ্যালেঞ্জ, এবং এর সমাধানের নাম <strong>consensus (ঐকমত্য)</strong>।</p>
+<p>এই অধ্যায়ে আমরা প্রথমে শিখব সেই মৌলিক সীমাবদ্ধতা যা প্রকৃতিগতভাবে আমাদের বেছে নিতে বাধ্য করে — <strong>CAP Theorem</strong>। তারপর দেখব consistency আসলে কত রকমের হতে পারে (<strong>Consistency Models</strong>) — কারণ "consistency" একটি একক জিনিস নয়, একটি বর্ণালী (spectrum)। এরপর দেখব কীভাবে নোডরা একজন নেতা বাছে (<strong>Leader Election</strong>) এবং কীভাবে তারা একমত হয় (<strong>Consensus</strong>) — দুটি বিখ্যাত অ্যালগরিদম <strong>Paxos</strong> ও <strong>Raft</strong>-এর মাধ্যমে। এই জ্ঞান আপনাকে Kafka, etcd, ZooKeeper, Cassandra, Spanner-এর মতো সিস্টেমের আচরণ বুঝতে এবং সঠিক ডাটাবেস ও কনফিগারেশন বেছে নিতে সাহায্য করবে।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি গভীরভাবে বুঝতে এবং বাস্তবে প্রয়োগ করতে পারবেন:</p>
+<ul>
+<li><strong>CAP Theorem</strong> — এর প্রকৃত অর্থ, ভুল ব্যাখ্যা, এবং <strong>PACELC</strong> সম্প্রসারণ</li>
+<li><strong>Consistency Models</strong>-এর সম্পূর্ণ বর্ণালী — Strong/Linearizable থেকে Eventual পর্যন্ত</li>
+<li><strong>Session Guarantees</strong> (read-your-writes, monotonic reads ইত্যাদি) — যা বাস্তবে সবচেয়ে কাজে লাগে</li>
+<li><strong>Quorum</strong> ভিত্তিক consistency (W + R &gt; N সূত্র) ও <strong>tunable consistency</strong></li>
+<li><strong>Replication</strong> কৌশল — single-leader, multi-leader, leaderless</li>
+<li><strong>Leader Election</strong> কীভাবে কাজ করে</li>
+<li><strong>Consensus</strong> সমস্যা, <strong>FLP impossibility</strong>, এবং কেন এটি কঠিন</li>
+<li><strong>Paxos</strong> ও <strong>Raft</strong>-এর ভেতরের কাজ এবং তাদের পার্থক্য</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ CAP Theorem — distributed systems-এর মৌলিক ত্রিভুজ</h3>
+<p>CAP Theorem (Eric Brewer, ২০০০) বলে যে একটি distributed data system একই সাথে নিচের তিনটি বৈশিষ্ট্যের মধ্যে সর্বোচ্চ <strong>দুটি</strong> সম্পূর্ণভাবে নিশ্চিত করতে পারে, তিনটি একসাথে নয়:</p>
+<p><strong>C — Consistency (সামঞ্জস্য):</strong> প্রতিটি পড়া (read) হয় সর্বশেষ লেখা (write) মানটি ফেরত দেবে, নয়তো একটি ত্রুটি দেবে। অর্থাৎ সব নোড একই মুহূর্তে একই ডাটা দেখে। লক্ষ্য করুন — এখানে "Consistency" মানে ACID-এর C নয়; এটি বিশেষভাবে <strong>linearizability</strong> (নিচে বিস্তারিত)।</p>
+<p><strong>A — Availability (উপলভ্যতা):</strong> প্রতিটি অনুরোধ একটি (অ-ত্রুটি) উত্তর পায় — যদিও সেটি সর্বশেষ ডাটা না-ও হতে পারে। অর্থাৎ সিস্টেম সবসময় সাড়া দেয়।</p>
+<p><strong>P — Partition Tolerance (বিভাজন সহনশীলতা):</strong> নেটওয়ার্ক নোডগুলোর মধ্যে মেসেজ হারালে বা বিলম্বিত হলেও (network partition) সিস্টেম কাজ চালিয়ে যায়।</p>
+<p><strong>এখানেই আসল অন্তর্দৃষ্টি, যা বেশিরভাগ মানুষ ভুল বোঝে:</strong> একটি বাস্তব distributed system-এ <strong>network partition (P) এড়ানো যায় না</strong> — নেটওয়ার্ক অবিশ্বস্ত, কেবল কাটতে পারে, সুইচ মরতে পারে, প্যাকেট হারাতে পারে। তাই P একটি <strong>বিকল্প নয়, একটি বাস্তবতা</strong>। ফলে আসল পছন্দটি C আর A-এর মধ্যে, এবং সেটিও <strong>শুধুমাত্র যখন একটি partition ঘটছে তখন</strong>। স্বাভাবিক সময়ে (যখন partition নেই) আপনি C ও A দুটোই পেতে পারেন।</p>
+<p><strong>তাহলে partition-এর সময় কী হয়?</strong> ধরুন নেটওয়ার্ক দুই ভাগে বিভক্ত, আর একটি অনুরোধ এসেছে যা সর্বশেষ ডাটা জানে না এমন এক পাশে পৌঁছেছে। সিস্টেমের দুটি পছন্দ:<br />
+- <strong>CP (Consistency বেছে নেওয়া):</strong> "আমি নিশ্চিত নই এটি সর্বশেষ ডাটা কি না, তাই উত্তর দেব না (ত্রুটি দেব)।" → consistency রক্ষা, কিন্তু availability ত্যাগ।<br />
+- <strong>AP (Availability বেছে নেওয়া):</strong> "আমি যা জানি তাই উত্তর দেব, যদিও তা পুরোনো (stale) হতে পারে।" → availability রক্ষা, কিন্তু consistency ত্যাগ।</p>
+<p><strong>বাস্তব উদাহরণ:</strong><br />
+- <strong>CP সিস্টেম:</strong> ব্যাংকিং, inventory, distributed lock — যেখানে ভুল/stale ডাটা অগ্রহণযোগ্য। উদাহরণ: ZooKeeper, etcd, HBase, MongoDB (ডিফল্ট), Google Spanner। এরা partition-এ বরং অনুপলব্ধ হবে, তবু ভুল ডাটা দেবে না।<br />
+- <strong>AP সিস্টেম:</strong> সোশ্যাল মিডিয়া ফিড, shopping cart, DNS — যেখানে সামান্য পুরোনো ডাটা সহনীয়, কিন্তু সিস্টেম চালু থাকা জরুরি। উদাহরণ: Cassandra, DynamoDB, Riak। এরা partition-এ চালু থাকবে, পরে ডাটা মিলিয়ে নেবে (eventual consistency)।</p>
+<h3>৩.২ PACELC — CAP-এর বাস্তবসম্মত সম্প্রসারণ</h3>
+<p>CAP-এর একটি বড় দুর্বলতা: এটি শুধু partition-এর সময়ের কথা বলে, কিন্তু partition তো বিরল। বাকি ৯৯.৯% সময়ে কী? এর উত্তর দেয় <strong>PACELC</strong>:</p>
+<blockquote>
+<p><strong>if P</strong> (partition) → <strong>A or C</strong>; <strong>Else</strong> (স্বাভাবিক সময়) → <strong>L (Latency) or C (Consistency)</strong>।</p>
+</blockquote>
+<p>অর্থাৎ, partition না থাকলেও একটি ট্রেড-অফ থাকে — আপনি যদি প্রতিটি লেখা সব replica-তে নিশ্চিত করে তবেই উত্তর দেন (strong consistency), তাহলে latency বাড়ে; আর যদি দ্রুত উত্তর দিতে চান (low latency), তাহলে consistency শিথিল করতে হয়। এটি বাস্তবে অনেক বেশি প্রাসঙ্গিক, কারণ latency বনাম consistency-র এই দ্বন্দ্ব আপনি প্রতিদিন মোকাবিলা করেন।</p>
+<p>উদাহরণ: DynamoDB ও Cassandra হলো <strong>PA/EL</strong> (partition-এ availability, স্বাভাবিক সময়ে latency বেছে নেয়)। Spanner হলো <strong>PC/EC</strong> (সবসময় consistency বেছে নেয়, latency-র মূল্যে)।</p>
+<h3>৩.৩ Consistency Models — consistency একটি বর্ণালী</h3>
+<p>"Consistency" একক কোনো জিনিস নয়; এটি দুর্বল থেকে শক্তিশালী পর্যন্ত একটি ধারাবাহিক বর্ণালী। কোন মডেল বাছবেন তা নির্ভর করে আপনার অ্যাপ্লিকেশন কতটা stale/বিশৃঙ্খল ডাটা সহ্য করতে পারে এবং কত পারফরম্যান্স চায়। শক্তিশালী থেকে দুর্বলের দিকে:</p>
+<p><strong>১. Linearizability (Strong Consistency / Atomic Consistency):</strong><br />
+এটি সবচেয়ে শক্তিশালী মডেল। এর অর্থ — পুরো সিস্টেমকে এমন আচরণ করতে হবে যেন <strong>একটিমাত্র কপি ডাটা</strong> আছে এবং প্রতিটি অপারেশন একটি নির্দিষ্ট তাৎক্ষণিক মুহূর্তে ঘটছে। একবার একটি লেখা সম্পন্ন হলে, তার পরের <em>যেকোনো</em> পড়া (যেকোনো নোড থেকে) অবশ্যই সেই নতুন মান দেখবে। অর্থাৎ সময়ের একটি বাস্তব ক্রম (real-time order) মানা হয়।<br />
+- <em>বাস্তব অর্থ:</em> এটি প্রোগ্রামারের জন্য সবচেয়ে সহজ মডেল — সিস্টেম একটি একক মেশিনের মতো আচরণ করে, কোনো বিভ্রান্তি নেই।<br />
+- <em>মূল্য:</em> এর জন্য নোডগুলোর মধ্যে coordination (consensus) লাগে, যা latency বাড়ায় এবং partition-এ availability কমায়। distributed lock, leader election, ব্যাংক ব্যালেন্সে এটি দরকার।</p>
+<p><strong>২. Sequential Consistency:</strong><br />
+সব নোড অপারেশনগুলোকে একই <strong>ক্রমে</strong> দেখবে, এবং প্রতিটি client-এর নিজের অপারেশনের ক্রম রক্ষিত থাকবে — কিন্তু এই ক্রম বাস্তব সময়ের সাথে মিলতে হবে না। অর্থাৎ একটি গ্লোবাল ক্রম আছে, কিন্তু তা "wall-clock" সময়ের সাথে সংযুক্ত নয়। linearizability-র চেয়ে সামান্য দুর্বল।</p>
+<p><strong>৩. Causal Consistency:</strong><br />
+শুধু সেই অপারেশনগুলোর ক্রম রক্ষা করা হয় যাদের মধ্যে <strong>কার্যকারণ সম্পর্ক (cause-effect)</strong> আছে। যেমন — একটি পোস্ট এবং তার উত্তর (reply); উত্তর কখনো মূল পোস্টের আগে দেখা যাবে না। কিন্তু সম্পর্কহীন (concurrent) অপারেশনগুলো ভিন্ন নোডে ভিন্ন ক্রমে দেখা যেতে পারে। এটি একটি বাস্তবসম্মত মধ্যপন্থা — eventual-এর চেয়ে শক্তিশালী, strong-এর চেয়ে সস্তা।</p>
+<p><strong>৪. Eventual Consistency (দুর্বলতম, কিন্তু বহুল ব্যবহৃত):</strong><br />
+এটি শুধু প্রতিশ্রুতি দেয় — যদি কোনো নতুন লেখা না আসে, তবে <strong>শেষ পর্যন্ত (eventually)</strong> সব replica একই মানে পৌঁছাবে। কিন্তু "শেষ পর্যন্ত" কখন, এবং এর মধ্যে কোন নোড কী দেখবে, তার কোনো গ্যারান্টি নেই — আপনি stale ডাটা দেখতে পারেন।<br />
+- <em>বাস্তব অর্থ:</em> সর্বোচ্চ availability ও কম latency, কিন্তু অ্যাপ্লিকেশনকে অসামঞ্জস্য সামলাতে প্রস্তুত থাকতে হয় (যেমন conflict resolution)।<br />
+- <em>উদাহরণ:</em> DNS, সোশ্যাল মিডিয়া like count, Cassandra/DynamoDB (ডিফল্ট)।</p>
+<p><strong>Session Guarantees (সবচেয়ে ব্যবহারিক) — eventual-এর ওপর কিছু গ্যারান্টি:</strong><br />
+বিশুদ্ধ eventual consistency বিভ্রান্তিকর হতে পারে (আপনি নিজের লেখা ডাটাও পড়তে নাও পাবেন!)। তাই বাস্তবে কিছু "client-centric" গ্যারান্টি যোগ করা হয়, যা বাস্তব অ্যাপে অত্যন্ত গুরুত্বপূর্ণ:<br />
+- <strong>Read-Your-Writes:</strong> আপনি নিজের লেখা ডাটা সবসময় পরবর্তীতে পড়তে পারবেন। (যেমন প্রোফাইল আপডেট করার পর সেটি দেখা)।<br />
+- <strong>Monotonic Reads:</strong> একবার একটি নতুন মান দেখলে, পরে আর পুরোনো মানে ফিরে যাবেন না (সময় পেছনে যায় না)।<br />
+- <strong>Monotonic Writes:</strong> একই client-এর লেখাগুলো ক্রমানুসারে প্রয়োগ হবে।<br />
+- <strong>Writes-Follow-Reads:</strong> যা পড়েছেন তার ওপর ভিত্তি করে লেখা সেই পড়া মানের পরেই প্রয়োগ হবে।</p>
+<blockquote>
+<p><strong>ব্যবহারিক পরামর্শ:</strong> বাস্তবে আপনি প্রায়ই পুরো সিস্টেমে strong consistency চান না (ব্যয়বহুল), আবার বিশুদ্ধ eventual-ও না (বিভ্রান্তিকর)। বরং eventual + session guarantees (যেমন read-your-writes) প্রায়ই সঠিক ভারসাম্য — যেমন ব্যবহারকারী নিজের পোস্ট সঙ্গে সঙ্গে দেখবে, কিন্তু অন্যের জন্য কয়েক সেকেন্ড দেরি সহনীয়।</p>
+</blockquote>
+<h3>৩.৪ Replication কৌশল — consistency-র ভিত্তি</h3>
+<p>consistency মডেল বোঝার জন্য জানতে হবে ডাটা কীভাবে কপি হয়:</p>
+<p><strong>Single-Leader (Master-Slave / Primary-Replica):</strong><br />
+একটিমাত্র নোড (leader/primary) সব লেখা গ্রহণ করে; বাকি নোড (follower/replica) সেই পরিবর্তন কপি করে এবং পড়া (read) সামলায়।<br />
+- <em>সুবিধা:</em> সরল; লেখায় conflict নেই (একটিই লেখক); read scaling সহজ (অনেক replica)।<br />
+- <em>অসুবিধা:</em> leader একটি bottleneck ও single point of failure (failover লাগে — অধ্যায় ১২); replica-তে <strong>replication lag</strong> থাকে।<br />
+- <strong>Synchronous replication:</strong> leader follower-এর নিশ্চিতি পাওয়ার পর তবেই client-কে সফল বলে — কম RPO, কিন্তু ধীর ও follower মরলে আটকে যায়।<br />
+- <strong>Asynchronous replication:</strong> leader সঙ্গে সঙ্গে সফল বলে, পরে কপি হয় — দ্রুত, কিন্তু leader মরলে অকপি-হওয়া ডাটা হারায়।</p>
+<p><strong>Multi-Leader:</strong><br />
+একাধিক নোড লেখা গ্রহণ করে (যেমন বিভিন্ন datacenter-এ)। <em>সুবিধা:</em> প্রতিটি অঞ্চলে কম latency, partition-এ চালু থাকা। <em>অসুবিধা:</em> <strong>write conflict</strong> — দুই leader একই ডাটা ভিন্নভাবে বদলালে conflict resolution লাগে (last-write-wins, CRDT ইত্যাদি)।</p>
+<p><strong>Leaderless (Dynamo-style):</strong><br />
+কোনো নির্দিষ্ট leader নেই; client একাধিক নোডে সরাসরি লেখে/পড়ে। consistency নিশ্চিত হয় <strong>quorum</strong> দিয়ে। উদাহরণ: Cassandra, DynamoDB, Riak।</p>
+<h3>৩.৫ Quorum-based Consistency — tunable consistency-র গণিত</h3>
+<p>Leaderless সিস্টেমে consistency নিয়ন্ত্রণের একটি সুন্দর সূত্র আছে। ধরা যাক:<br />
+- <strong>N</strong> = মোট replica সংখ্যা<br />
+- <strong>W</strong> = একটি লেখা সফল বলার আগে কতগুলো replica নিশ্চিত করতে হবে (write quorum)<br />
+- <strong>R</strong> = একটি পড়ায় কতগুলো replica থেকে উত্তর নিতে হবে (read quorum)</p>
+<p><strong>মূল সূত্র:</strong> যদি <strong>W + R &gt; N</strong>, তাহলে strong consistency নিশ্চিত — কারণ read quorum আর write quorum-এ অন্তত একটি common replica থাকবেই, যা সর্বশেষ লেখা মানটি জানে।</p>
+<p><strong>ব্যবহারিক উদাহরণ (N=3):</strong><br />
+- <strong>W=3, R=1:</strong> লেখা সব replica-তে (ধীর লেখা), পড়া যেকোনো একটি থেকে (দ্রুত পড়া)। read-heavy সিস্টেমে ভালো।<br />
+- <strong>W=1, R=3:</strong> লেখা দ্রুত, পড়া ধীর। write-heavy সিস্টেমে ভালো।<br />
+- <strong>W=2, R=2:</strong> ভারসাম্য (3+1 = W+R=4 &gt; 3) → strong consistency, ভালো ভারসাম্য। <em>সবচেয়ে প্রচলিত।</em><br />
+- <strong>W=1, R=1:</strong> W+R=2, যা 3-এর বেশি নয় → eventual consistency, সর্বোচ্চ দ্রুত ও available, কিন্তু stale পড়ার ঝুঁকি।</p>
+<p>এই <strong>tunable consistency</strong>-ই Cassandra/DynamoDB-র শক্তি — আপনি প্রতি-query ভিত্তিতে consistency ও পারফরম্যান্সের ভারসাম্য বেছে নিতে পারেন।</p>
+<h3>৩.৬ Leader Election (নেতা নির্বাচন)</h3>
+<p>অনেক distributed সিস্টেমে একটি নোডকে "leader/coordinator" হতে হয় (যেমন single-leader replication-এ, বা কাজ সমন্বয়ে)। leader মারা গেলে একটি নতুন নেতা বাছতে হয় — এটিই <strong>Leader Election</strong>।</p>
+<p><strong>কেন কঠিন:</strong> নোডরা নিশ্চিতভাবে জানে না অন্য নোড মরেছে নাকি শুধু ধীর/বিচ্ছিন্ন; দুই নোড একসাথে নিজেকে leader ভাবলে split-brain (অধ্যায় ১২)।</p>
+<p><strong>সাধারণ পদ্ধতি:</strong><br />
+- <strong>Bully Algorithm:</strong> সর্বোচ্চ ID-র সক্রিয় নোড leader হয়; নেতা মরলে অন্যরা "election" শুরু করে, বড় ID-র নোড ছোটদের "bully" করে নিজে নেতা হয়।<br />
+- <strong>Ring Algorithm:</strong> নোডরা একটি বৃত্তে সাজানো; election মেসেজ বৃত্ত ঘুরে সর্বোচ্চ ID খুঁজে নেতা ঠিক করে।<br />
+- <strong>Lease-based:</strong> নেতা একটি সময়সীমিত "lease" ধরে; lease নবায়ন না করলে নেতৃত্ব ছেড়ে দিতে হয় (split-brain রোধে সাহায্য করে)।<br />
+- <strong>Coordination Service ব্যবহার (বাস্তবে সবচেয়ে প্রচলিত):</strong> নিজে অ্যালগরিদম না লিখে ZooKeeper/etcd-এর মতো সেবা ব্যবহার করা — যা ভেতরে consensus দিয়ে নিরাপদভাবে leader election করে দেয় (যেমন একটি ephemeral lock তৈরি করে)।</p>
+<h3>৩.৭ Consensus — distributed systems-এর কেন্দ্রীয় সমস্যা</h3>
+<p><strong>Consensus</strong> হলো এমন একটি সমস্যা যেখানে একদল নোডকে <strong>একটি একক মান (বা সিদ্ধান্ত) নিয়ে একমত</strong> হতে হবে — এমনকি যদি কিছু নোড ব্যর্থ হয়, মেসেজ হারায়, বা নেটওয়ার্ক বিলম্বিত হয়। এটি leader election, distributed lock, atomic commit, ও replicated state machine-এর ভিত্তি।</p>
+<p>একটি সঠিক consensus অ্যালগরিদমের চারটি বৈশিষ্ট্য থাকতে হয়:<br />
+- <strong>Agreement:</strong> সব সঠিক নোড একই মানে একমত হবে।<br />
+- <strong>Validity:</strong> যে মানে একমত হবে তা কোনো নোডের প্রস্তাবিত মান হতে হবে (এলোমেলো নয়)।<br />
+- <strong>Termination:</strong> সব সঠিক নোড শেষ পর্যন্ত একটি সিদ্ধান্তে পৌঁছাবে।<br />
+- <strong>Integrity:</strong> একবার সিদ্ধান্ত হলে তা বদলাবে না।</p>
+<p><strong>FLP Impossibility (একটি মৌলিক তাত্ত্বিক সীমা):</strong> ১৯৮৫-তে Fischer, Lynch ও Paterson প্রমাণ করেন — একটি সম্পূর্ণ অ্যাসিঙ্ক্রোনাস নেটওয়ার্কে, যদি একটি নোডও ব্যর্থ হতে পারে, তাহলে এমন কোনো consensus অ্যালগরিদম নেই যা <strong>নিশ্চিতভাবে সবসময় (guaranteed termination সহ)</strong> কাজ করবে — কারণ একটি ধীর নোড আর একটি মৃত নোডের পার্থক্য করা অসম্ভব। বাস্তবে এর সমাধান — সামান্য timing assumption (timeout) ও randomization ব্যবহার করে অ্যালগরিদমগুলো <strong>প্রায় সবসময়</strong> (in practice) কাজ করে। Paxos ও Raft এই বাস্তবসম্মত পথে চলে।</p>
+<p><strong>Quorum-এর ভূমিকা:</strong> consensus সাধারণত <strong>majority (সংখ্যাগরিষ্ঠতা)</strong>-র ওপর নির্ভর করে। তাই নোড সংখ্যা বিজোড় (৩, ৫, ৭) রাখা হয় — ৩ নোডে ২টি majority, একটি ব্যর্থতা সহনীয়; ৫ নোডে ৩টি majority, দুটি ব্যর্থতা সহনীয়। majority থাকায় দুটি বিরোধী সিদ্ধান্ত একসাথে হতে পারে না (যেকোনো দুই majority-তে অন্তত একটি common নোড)।</p>
+<h3>৩.৮ Paxos — প্রথম প্রমাণিত consensus অ্যালগরিদম</h3>
+<p>Leslie Lamport-এর তৈরি <strong>Paxos</strong> হলো প্রথম গাণিতিকভাবে প্রমাণিত consensus অ্যালগরিদম। এটি অত্যন্ত শক্তিশালী কিন্তু কুখ্যাতভাবে বোঝা ও সঠিকভাবে বাস্তবায়ন করা কঠিন।</p>
+<p><strong>তিনটি ভূমিকা (একটি নোড একাধিক ভূমিকা নিতে পারে):</strong><br />
+- <strong>Proposer:</strong> একটি মান প্রস্তাব করে।<br />
+- <strong>Acceptor:</strong> প্রস্তাব গ্রহণ/প্রত্যাখ্যান করে ভোট দেয়।<br />
+- <strong>Learner:</strong> কোন মানে একমত হলো তা জানে ও প্রয়োগ করে।</p>
+<p><strong>দুটি পর্যায় (Basic Paxos):</strong></p>
+<p><em>পর্যায় ১ — Prepare/Promise:</em><br />
+Proposer একটি অনন্য, ক্রমবর্ধমান নম্বর (n) নিয়ে সব Acceptor-কে একটি <code>Prepare(n)</code> পাঠায়। প্রতিটি Acceptor, যদি n তার দেখা সর্ববৃহৎ নম্বর হয়, তবে একটি <code>Promise</code> দেয় — প্রতিশ্রুতি দেয় যে এর চেয়ে ছোট নম্বরের কোনো প্রস্তাব আর গ্রহণ করবে না, এবং যদি আগে কোনো মান গ্রহণ করে থাকে তা জানায়।</p>
+<p><em>পর্যায় ২ — Accept/Accepted:</em><br />
+Proposer majority Acceptor থেকে Promise পেলে, একটি <code>Accept(n, value)</code> পাঠায় (value হলো হয় Acceptor-দের জানানো সর্বশেষ গৃহীত মান, নয়তো নিজের প্রস্তাব)। Acceptor-রা যদি n-এর চেয়ে বড় কোনো নম্বরের Promise না দিয়ে থাকে, তবে তা <code>Accepted</code> করে। majority accept করলে consensus অর্জিত হয়।</p>
+<p><strong>কেন এত pre-cautions:</strong> এই দুই-পর্যায়ের নম্বরিং নিশ্চিত করে যে একাধিক proposer একসাথে কাজ করলেও, এবং নোড মরলেও, কখনো দুটি ভিন্ন মানে একমত হওয়া যাবে না (safety)।</p>
+<p><strong>Multi-Paxos:</strong> প্রতিটি সিদ্ধান্তের জন্য বারবার দুই পর্যায় চালানো ব্যয়বহুল। Multi-Paxos একজন স্থিতিশীল leader নির্বাচন করে পর্যায় ১ একবারই চালায়, তারপর ধারাবাহিক সিদ্ধান্তের জন্য শুধু পর্যায় ২ চালায় — অনেক দ্রুত। এটিই বাস্তবে ব্যবহৃত হয় (যেমন Google Chubby, Spanner)।</p>
+<h3>৩.৯ Raft — বোঝার জন্য ডিজাইন করা consensus</h3>
+<p>Paxos বোঝা ও বাস্তবায়ন এত কঠিন ছিল যে ২০১৪-তে Diego Ongaro ও John Ousterhout <strong>Raft</strong> তৈরি করেন — একই শক্তি, কিন্তু <strong>understandability (বোধগম্যতা)</strong>-কে প্রধান লক্ষ্য করে। আজ etcd, Consul, CockroachDB, TiKV — সবই Raft ব্যবহার করে।</p>
+<p>Raft সমস্যাটিকে তিনটি স্বাধীন অংশে ভাগ করে:</p>
+<p><strong>১. Leader Election:</strong><br />
+প্রতিটি নোড তিন অবস্থার একটিতে থাকে — <strong>Follower, Candidate, Leader</strong>। সময়কে <strong>term</strong> নামক ক্রমিক অংশে ভাগ করা হয়। স্বাভাবিকভাবে একজন leader থাকে যে নিয়মিত <strong>heartbeat</strong> পাঠায়। কোনো follower যদি একটি <strong>randomized election timeout</strong> (যেমন ১৫০–৩০০ ms, এলোমেলো বলে দুজন একসাথে শুরু করে না) পর্যন্ত heartbeat না পায়, তবে সে নিজেকে Candidate ঘোষণা করে, term বাড়ায়, এবং সবার কাছে ভোট চায়। majority ভোট পেলে সে নতুন Leader। randomized timeout split vote কমায় — যদি কখনো টাই হয়, নতুন timeout-এ আবার চেষ্টা।</p>
+<p><strong>২. Log Replication:</strong><br />
+সব client অনুরোধ leader-এ যায়। leader প্রতিটি অনুরোধকে তার <strong>log</strong>-এ একটি entry হিসেবে যোগ করে, তারপর সব follower-কে <code>AppendEntries</code> দিয়ে পাঠায়। একটি entry তখনই <strong>committed</strong> হয় যখন majority follower এটি তাদের log-এ লেখে। committed হলে leader তা নিজের state machine-এ প্রয়োগ করে ও client-কে নিশ্চিত করে। এভাবে সব নোডের log একই থাকে — একে বলে <strong>replicated state machine</strong>।</p>
+<p><strong>৩. Safety:</strong><br />
+Raft কিছু নিয়ম দিয়ে নিশ্চিত করে যে কখনো ভুল হবে না — যেমন একজন নোড শুধু সেই candidate-কে ভোট দেবে যার log অন্তত তার নিজের মতোই up-to-date (Leader Completeness)। এটি নিশ্চিত করে নতুন leader-এর কাছে সব committed entry আছে — কোনো committed ডাটা হারায় না।</p>
+<p><strong>Raft vs Paxos:</strong> কার্যকারিতায় সমতুল্য, কিন্তু Raft অনেক বেশি বোধগম্য — একজন শক্তিশালী leader, স্পষ্ট term, এবং সমস্যার পরিষ্কার বিভাজন। তাই আধুনিক নতুন সিস্টেমে Raft-ই প্রথম পছন্দ।</p>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনি একটি distributed configuration store বানাচ্ছেন (যেমন সব microservice-এর জন্য feature flags ও database connection strings রাখবে)। এর তিনটি কঠিন প্রয়োজন:</p>
+<ol start="১">
+<li><strong>একটি মান বদলালে সব নোড একই মান দেখবে</strong> — দুটি সার্ভিস যেন দুটি ভিন্ন config না পায় (নইলে বিশৃঙ্খলা)। এর মানে <strong>strong consistency / linearizability</strong> দরকার।</li>
+<li><strong>কয়েকটি নোড মরলেও সিস্টেম চালু থাকবে</strong> — config store ডাউন মানে সব সার্ভিস ডাউন।</li>
+<li><strong>কে "সত্য" তা নির্ধারণে একজন সমন্বয়কারী</strong> দরকার।</li>
+</ol>
+<p>এই চাহিদাগুলো ঠিক যা <strong>consensus</strong> সমাধান করে। আপনি নিজে Raft লিখতে পারেন (ভুল হওয়ার বিশাল ঝুঁকি), অথবা — বাস্তবে যা করা উচিত — <strong>etcd বা ZooKeeper</strong> ব্যবহার করুন, যারা ভেতরে Raft/ZAB (Paxos-সদৃশ) দিয়ে এই সমস্যা সমাধান করেছে। আপনি ৩ বা ৫ নোডের একটি etcd cluster চালাবেন; এটি majority quorum দিয়ে strong consistency দেবে, একটি (৩-এ) বা দুটি (৫-এ) নোড ব্যর্থতা সহ্য করবে, এবং leader election স্বয়ংক্রিয়ভাবে সামলাবে।</p>
+<p><strong>এই অধ্যায়ের জ্ঞান কেন বাস্তব কাজে লাগে:</strong> এটি বুঝলে আপনি জানবেন কেন etcd cluster বিজোড় সংখ্যক নোডে চালাতে হয়, কেন এটি majority হারালে লেখা বন্ধ করে দেয় (CP সিস্টেম), এবং কেন এর ওপর leader election বা distributed lock বানানো নিরাপদ। আবার, একটি AP সিস্টেম (Cassandra) কেন config store-এর জন্য খারাপ পছন্দ — কারণ stale config বিপজ্জনক — তাও বুঝবেন।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>CAP — partition-এর সময় পছন্দ</h3>
+<div class="mermaid">graph TD
+    P[Network Partition ঘটেছে] --> Q{সিস্টেম কী করবে?}
+    Q -->|CP| C[Consistency রক্ষা<br/>অনিশ্চিত নোড ত্রুটি দেয়<br/>availability ত্যাগ]
+    Q -->|AP| A[Availability রক্ষা<br/>stale উত্তর দেয়<br/>consistency ত্যাগ]</div>
+<h3>Consistency বর্ণালী (শক্তিশালী → দুর্বল)</h3>
+<pre><code>শক্তিশালী                                              দুর্বল
+   |                                                     |
+Linearizable → Sequential → Causal → Eventual(+session)
+   |               |            |            |
+ একক-কপি       গ্লোবাল ক্রম   কারণ-ক্রম    শেষে মিলবে
+ (ব্যয়বহুল)                              (সস্তা, দ্রুত)
+</code></pre>
+<h3>Raft Leader Election ও Log Replication</h3>
+<div class="mermaid">graph TD
+    subgraph Term 5
+    L[Leader] -->|AppendEntries + heartbeat| F1[Follower 1]
+    L -->|AppendEntries| F2[Follower 2]
+    end
+    C[Client write] --> L
+    F1 -.->|majority লিখলে committed| L
+    F2 -.->|ack| L</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> এক Leader, একাধিক Follower, একটি Client; সবাই একটি term-এ।<br />
+- <strong>Flow:</strong> client লেখা leader-এ যায় → leader log-এ যোগ করে follower-দের পাঠায় → majority লিখলে entry committed → state machine-এ প্রয়োগ।<br />
+- <strong>Failure Points:</strong> leader মারা গেলে heartbeat থামে → follower election timeout পেরিয়ে নতুন term-এ candidate হয়ে নতুন leader বাছে। majority না থাকলে লেখা বন্ধ (CP আচরণ — নিরাপত্তার জন্য)।<br />
+- <strong>Quorum:</strong> ৩ নোডে ২টির সম্মতি লাগে; তাই ১টি ব্যর্থতা সহনীয়, split-brain অসম্ভব।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>Quorum consistency যাচাই (Python — ধারণাগত)</h3>
+<pre><code class="language-python">def is_strongly_consistent(N, W, R):
+    &quot;&quot;&quot;W + R &gt; N হলে strong consistency নিশ্চিত&quot;&quot;&quot;
+    return (W + R) &gt; N
+
+# N=3 replica সহ বিভিন্ন কনফিগ
+print(is_strongly_consistent(3, 2, 2))  # True  → strong (4 &gt; 3)
+print(is_strongly_consistent(3, 1, 1))  # False → eventual (2 &gt; 3 নয়)
+print(is_strongly_consistent(3, 3, 1))  # True  → strong, দ্রুত পড়া
+
+def quorum_write(replicas, key, value, W):
+    acks = 0
+    for r in replicas:
+        if r.write(key, value):       # প্রতিটি replica-তে লেখার চেষ্টা
+            acks += 1
+        if acks &gt;= W:                 # W সংখ্যক নিশ্চিত হলেই সফল
+            return &quot;success&quot;
+    return &quot;failed&quot;                   # W পূরণ না হলে ব্যর্থ
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> <code>W + R &gt; N</code> সূত্রটি গাণিতিকভাবে নিশ্চিত করে read quorum ও write quorum-এ অন্তত একটি common replica থাকবে, যা সর্বশেষ লেখা জানে — তাই strong consistency। <code>quorum_write</code> দেখায় কীভাবে শুধু W সংখ্যক replica নিশ্চিত করেই সফল ঘোষণা করা হয় (সব N-এর জন্য অপেক্ষা না করে), যা latency ও consistency-র ভারসাম্য দেয়। বাস্তবে Cassandra-তে এটি <code>CONSISTENCY QUORUM</code> সেট করে করা হয়।</p>
+<h3>etcd দিয়ে distributed leader election (বাস্তব, প্রস্তাবিত পথ)</h3>
+<pre><code class="language-python">import etcd3
+
+client = etcd3.client(host='localhost', port=2379)
+
+# একটি lease নেওয়া (TTL 10 সে.) — নেতৃত্বের &quot;মেয়াদ&quot;
+lease = client.lease(10)
+
+# leader হওয়ার চেষ্টা: শুধু তখনই key তৈরি হবে যদি এটি না থাকে (atomic)
+success, _ = client.transaction(
+    compare=[client.transactions.create('/leader') == 0],   # key নেই?
+    success=[client.transactions.put('/leader', 'node-A', lease)],
+    failure=[]
+)
+
+if success:
+    print(&quot;আমি leader! lease নবায়ন করতে থাকব...&quot;)
+    # নিয়মিত lease.refresh() — মরে গেলে lease শেষ হয়ে key মুছে যাবে,
+    # তখন অন্য নোড leader হতে পারবে (স্বয়ংক্রিয় failover)
+else:
+    print(&quot;অন্য কেউ leader, আমি follower হিসেবে watch করব&quot;)
+    client.add_watch_callback('/leader', lambda e: print(&quot;leader বদলেছে&quot;))
+</code></pre>
+<p><strong>ব্যাখ্যা ও বাস্তব প্রয়োগ:</strong> নিজে Raft/Paxos না লিখে, etcd (যা ভেতরে Raft চালায়) ব্যবহার করে নিরাপদে leader election করা হচ্ছে। মূল চাতুর্য — একটি <strong>atomic compare-and-set</strong> (transaction) দিয়ে <code>/leader</code> key তৈরির চেষ্টা; একসাথে অনেক নোড চেষ্টা করলেও Raft নিশ্চিত করে শুধু <strong>একজনই</strong> সফল হবে (split-brain অসম্ভব)। <strong>lease (TTL)</strong> নিশ্চিত করে leader মরে গেলে key স্বয়ংক্রিয়ভাবে মুছে যাবে এবং অন্য নোড নেতৃত্ব নিতে পারবে। এটি প্রোডাকশনে leader election-এর আদর্শ প্যাটার্ন।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Google Spanner:</strong> বিশ্বব্যাপী বিস্তৃত হয়েও <strong>strong consistency (linearizability)</strong> দেয় — Paxos ও "TrueTime" (পরমাণু ঘড়ি + GPS দিয়ে নির্ভুল সময়) ব্যবহার করে। এটি প্রমাণ করে যথেষ্ট প্রকৌশলে CP সিস্টেমও বিশ্ব-স্কেলে সম্ভব। PACELC-এ এটি PC/EC।</li>
+<li><strong>Amazon DynamoDB / Cassandra:</strong> Amazon-এর মূল Dynamo পেপার AP ও eventual consistency-র দর্শন প্রতিষ্ঠা করে — shopping cart কখনো "অনুপলব্ধ" হওয়ার চেয়ে সামান্য পুরোনো হওয়া ভালো। tunable consistency (W/R/N) এদের মূল বৈশিষ্ট্য।</li>
+<li><strong>etcd (Kubernetes-এর হৃদয়):</strong> Kubernetes-এর সব cluster state etcd-তে থাকে, যা <strong>Raft</strong> দিয়ে strong consistency ও HA দেয় — তাই Kubernetes control plane নির্ভরযোগ্য।</li>
+<li><strong>Apache ZooKeeper:</strong> ZAB (Paxos-সদৃশ) প্রোটোকল দিয়ে coordination, leader election ও config management দেয়; Kafka (পুরোনো সংস্করণ), HBase-এর ভিত্তি।</li>
+<li><strong>Apache Kafka:</strong> controller leader election ও partition replication-এ consensus ব্যবহার করে (নতুন সংস্করণে KRaft = Raft, ZooKeeper-এর বদলে)।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- CAP-এর "C"-কে ACID-এর "C" ভাবা — দুটি ভিন্ন জিনিস (CAP-এর C = linearizability)।<br />
+- ভাবা যে "P বেছে না নিলেই হয়" — partition একটি বাস্তবতা, পছন্দ নয়।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- "eventual consistency" মানে "consistency নেই" ভাবা — আসলে এটি একটি নির্দিষ্ট গ্যারান্টি।<br />
+- session guarantees (read-your-writes) উপেক্ষা করা — ফলে ব্যবহারকারী নিজের আপডেট দেখতে পায় না।<br />
+- consensus cluster-এ জোড় সংখ্যক নোড (যেমন ৪) রাখা — quorum-এ কোনো বাড়তি সুবিধা নেই, বরং খরচ বেশি (৪-এও majority ৩, ৩-এর মতোই একটি ব্যর্থতা সহনীয়)।</p>
+<p><strong>Production Mistakes:</strong><br />
+- নিজে Paxos/Raft বাস্তবায়ন করার চেষ্টা — সূক্ষ্ম safety bug-এর বিশাল ঝুঁকি; etcd/ZooKeeper ব্যবহার করুন।<br />
+- replication lag উপেক্ষা করে follower থেকে পড়া এবং strong consistency আশা করা।<br />
+- async replication-এ leader failover-এর পর হারানো ডাটার সম্ভাবনা না বোঝা (RPO &gt; 0)।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- সবকিছুতে strong consistency চাপানো — অপ্রয়োজনীয় latency ও কম availability; কোথায় eventual যথেষ্ট তা না বোঝা।<br />
+- consensus cluster-কে অতিরিক্ত বড় করা — বেশি নোড মানে ধীর consensus (বেশি coordination)।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- ভুল ডাটাবেস বাছা — config/lock-এর জন্য AP সিস্টেম (Cassandra), বা analytics-এর জন্য অপ্রয়োজনীয় CP সিস্টেম।<br />
+- multi-leader ব্যবহার করে conflict resolution কৌশল না রাখা।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>CAP Theorem কী?</em></p>
+<blockquote>
+<p>distributed system একসাথে Consistency, Availability ও Partition Tolerance — তিনটির মধ্যে সর্বোচ্চ দুটি সম্পূর্ণ নিশ্চিত করতে পারে। যেহেতু partition বাস্তবে এড়ানো যায় না, প্রকৃত পছন্দটি partition-এর সময় C নাকি A — অর্থাৎ CP নাকি AP।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Strong আর Eventual consistency-র পার্থক্য, এবং কখন কোনটি?</em></p>
+<blockquote>
+<p>Strong (linearizable) — প্রতিটি পড়া সর্বশেষ লেখা দেখে, যেন একক কপি; ব্যাংক/lock/config-এ দরকার, কিন্তু ধীর ও partition-এ কম available। Eventual — শেষ পর্যন্ত সব মিলবে, এর মধ্যে stale সম্ভব; সোশ্যাল ফিড/cart-এ যথেষ্ট, দ্রুত ও high-available।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Quorum কীভাবে consistency নিশ্চিত করে?</em></p>
+<blockquote>
+<p>N replica-তে যদি write quorum W ও read quorum R মেনে W + R &gt; N হয়, তবে read ও write quorum-এ অন্তত একটি common replica থাকবেই, যা সর্বশেষ লেখা জানে — তাই strong consistency। N=3, W=2, R=2 একটি সাধারণ ভারসাম্য।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>Raft কীভাবে leader election করে এবং split vote এড়ায়?</em></p>
+<blockquote>
+<p>সময় term-এ বিভক্ত; follower election timeout-এ heartbeat না পেলে candidate হয়ে term বাড়িয়ে ভোট চায়; majority পেলে leader। প্রতিটি নোডের <strong>randomized</strong> timeout থাকায় দুজন সাধারণত একসাথে শুরু করে না — তাই split vote বিরল; টাই হলে নতুন randomized timeout-এ আবার চেষ্টা। Leader Completeness নিয়ম নিশ্চিত করে নতুন leader-এর কাছে সব committed entry আছে।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>Paxos আর Raft-এর মধ্যে পার্থক্য কী?</em></p>
+<blockquote>
+<p>কার্যকারিতায় সমতুল্য (উভয়ই fault-tolerant consensus)। Paxos আগের, গাণিতিকভাবে মৌলিক, কিন্তু বোঝা ও বাস্তবায়ন কঠিন (ভূমিকা proposer/acceptor/learner, দুই-পর্যায়)। Raft একই শক্তি কিন্তু understandability-কেন্দ্রিক — শক্তিশালী একক leader, স্পষ্ট term, সমস্যার পরিষ্কার বিভাজন (election/replication/safety)। আধুনিক সিস্টেমে Raft বেশি ব্যবহৃত।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি distributed lock service ডিজাইন করুন।</em></p>
+<blockquote>
+<p>এটি একটি strong-consistency, CP সমস্যা — দুটি client একসাথে lock পেতে পারবে না। নিজে consensus না লিখে <strong>etcd/ZooKeeper</strong> (৩ বা ৫ নোড, Raft/ZAB) ব্যবহার করুন। lock = একটি key-তে atomic compare-and-set + <strong>lease/TTL</strong> (client মরলে lock স্বয়ংক্রিয়ভাবে মুক্ত হবে — deadlock রোধ)। majority quorum strong consistency ও HA দেবে; fencing token দিয়ে stale lock-holder রোধ। বিজোড় নোড সংখ্যা split-brain এড়াবে।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices — বাস্তবে প্রয়োগযোগ্য)</h2>
+<ul>
+<li><strong>নিজে consensus বাস্তবায়ন করবেন না</strong> — etcd, ZooKeeper, Consul ব্যবহার করুন; এদের বছরের পর বছর পরীক্ষিত।</li>
+<li><strong>consistency-র প্রয়োজন বুঝে ডাটাবেস বাছুন:</strong> config/lock/ব্যালেন্স → CP (strong); ফিড/cart/analytics → AP (eventual যথেষ্ট)।</li>
+<li><strong>সর্বত্র strong consistency চাপাবেন না</strong> — যেখানে eventual + session guarantees যথেষ্ট, সেখানে তাই ব্যবহার করে latency ও availability বাড়ান।</li>
+<li><strong>read-your-writes-এর মতো session guarantee</strong> নিশ্চিত করুন ব্যবহারকারী-মুখী অংশে।</li>
+<li><strong>consensus/quorum cluster-এ বিজোড় সংখ্যক নোড (৩, ৫)</strong> রাখুন; অপ্রয়োজনে বড় করবেন না।</li>
+<li><strong>Quorum টিউন করুন</strong> (W/R/N) আপনার read/write প্যাটার্ন অনুযায়ী।</li>
+<li><strong>replication lag ও RPO বুঝুন</strong> — async replication-এ failover-এ ডাটা হারানোর ঝুঁকি জেনে সিদ্ধান্ত নিন।</li>
+<li><strong>leader election-এ lease/TTL ও fencing token</strong> ব্যবহার করুন — stale leader/split-brain রোধে।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>CAP:</strong> partition (P) অনিবার্য, তাই partition-এ পছন্দ C নাকি A (CP vs AP)। <strong>PACELC:</strong> স্বাভাবিক সময়েও Latency vs Consistency।<br />
+- <strong>Consistency বর্ণালী:</strong> Linearizable (strong) → Sequential → Causal → Eventual; বাস্তবে <strong>session guarantees</strong> (read-your-writes ইত্যাদি) অত্যন্ত গুরুত্বপূর্ণ।<br />
+- <strong>Replication:</strong> Single-leader (সরল, lag), Multi-leader (conflict), Leaderless (quorum)।<br />
+- <strong>Quorum:</strong> <strong>W + R &gt; N</strong> → strong consistency; tunable (Cassandra/Dynamo)।<br />
+- <strong>Leader Election:</strong> Bully, Ring, lease-based, বা coordination service (প্রস্তাবিত)।<br />
+- <strong>Consensus:</strong> majority-ভিত্তিক ঐকমত্য; <strong>FLP</strong> বলে নিশ্চিত termination অসম্ভব, তাই বাস্তবে timeout/randomization।<br />
+- <strong>Paxos:</strong> proposer/acceptor/learner; prepare-promise + accept-accepted; শক্তিশালী কিন্তু কঠিন; Multi-Paxos দ্রুত।<br />
+- <strong>Raft:</strong> understandable; leader election (term + randomized timeout) + log replication + safety; আধুনিক স্ট্যান্ডার্ড।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> CAP, CP/AP, PACELC, Linearizability, Sequential/Causal/Eventual Consistency, Read-Your-Writes, Monotonic Reads, Quorum, W+R&gt;N, Tunable Consistency, Single/Multi/Leaderless Replication, Sync/Async Replication, Replication Lag, Leader Election, Bully Algorithm, Lease, Consensus, FLP Impossibility, Paxos (Proposer/Acceptor/Learner), Multi-Paxos, Raft (Term/Heartbeat/AppendEntries), Replicated State Machine, Fencing Token।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. কেন একটি বাস্তব distributed system-এ Partition Tolerance "বেছে নেওয়ার" বিষয় নয় তা ব্যাখ্যা করুন।<br />
+2. Linearizability, Causal ও Eventual consistency-র মধ্যে পার্থক্য একটি করে উদাহরণসহ লিখুন।</p>
+<p><strong>Practical:</strong><br />
+3. N=5 replica-তে strong consistency নিশ্চিত করতে W ও R-এর কোন কোন সমন্বয় কাজ করবে? read-heavy সিস্টেমের জন্য কোনটি বাছবেন?<br />
+4. উপরের etcd leader-election কোডে lease নবায়ন (refresh) লুপ যোগ করুন এবং leader মারা গেলে কী ঘটে তা ব্যাখ্যা করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি বিশ্বব্যাপী ই-কমার্স সিস্টেমের জন্য ঠিক করুন কোন কোন অংশে strong consistency (CP) ও কোথায় eventual (AP) ব্যবহার করবেন — inventory, cart, product reviews, order payment আলাদাভাবে বিবেচনা করে যুক্তি দিন।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার async-replicated ডাটাবেসে leader failover-এর পর কিছু সদ্য-সফল অর্ডার "হারিয়ে" গেছে। কেন এটি ঘটল এবং কীভাবে রোধ করতেন (RPO-র দৃষ্টিকোণ থেকে)?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন একটি distributed lock service-এ AP ডাটাবেস (Cassandra) ব্যবহার করা বিপজ্জনক, এবং কেন etcd/ZooKeeper (CP, Raft/ZAB) সঠিক পছন্দ।</p>
+<hr />
+<p><strong>অধ্যায় ১৩ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

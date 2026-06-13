@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ৬: CDN এবং Object, Block ও File Storage — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html" class="active"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ৬
+      </div>
+      <div class="page-nav">
+        <a href="chapter-5.html">← আগের অধ্যায়</a>
+        <a href="chapter-7.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ৬</div>
+      <h1>অধ্যায় ৬: CDN এবং Object, Block ও File Storage</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>আগের অধ্যায়ে আমরা শিখেছি কীভাবে caching ডাটাবেসের লোড কমায়। কিন্তু একটি সমস্যা থেকে যায় — <strong>ভূগোল (geography)</strong>। আপনার সার্ভার যদি ঢাকায় থাকে, তবে নিউইয়র্কের ব্যবহারকারীর প্রতিটি অনুরোধকে অর্ধেক পৃথিবী পাড়ি দিতে হয়। আলোর গতিরও একটি সীমা আছে — এই দূরত্ব মানেই অনিবার্য latency। একটি ছবি বা ভিডিও যদি প্রতিবার এত দূর থেকে আনতে হয়, ব্যবহারকারীর অভিজ্ঞতা ধীর হয়ে যায়।</p>
+<p>এর সমাধান হলো <strong>CDN (Content Delivery Network)</strong> — ব্যবহারকারীর কাছাকাছি কনটেন্ট রেখে দেওয়া। এই অধ্যায়ের প্রথম অংশে আমরা CDN-এর গভীরে যাব।</p>
+<p>দ্বিতীয় অংশে আমরা শিখব ডাটা কোথায় ও কীভাবে সংরক্ষণ করা হয় — কারণ ফাইল, ছবি, ভিডিও, ব্যাকআপ — এগুলো ডাটাবেসে রাখা হয় না। তিন ধরনের স্টোরেজ আছে: <strong>Object Storage, Block Storage, ও File Storage</strong>। প্রতিটির আলাদা ব্যবহার, সুবিধা ও ট্রেড-অফ আছে। ক্লাউড আর্কিটেকচারে কোন স্টোরেজ কোথায় ব্যবহার করবেন — এই জ্ঞান অপরিহার্য।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>CDN</strong> কী, কেন দরকার, এবং ভেতরে কীভাবে কাজ করে</li>
+<li><strong>Edge Server, PoP (Point of Presence), Origin Server</strong>-এর ধারণা</li>
+<li><strong>Push CDN</strong> ও <strong>Pull CDN</strong>-এর পার্থক্য</li>
+<li>Edge-এ caching, <strong>TTL</strong>, <strong>Cache-Control</strong>, এবং <strong>Cache Purge/Invalidation</strong></li>
+<li>CDN-এর নিরাপত্তা ভূমিকা (TLS, DDoS, WAF)</li>
+<li><strong>Object, Block, ও File Storage</strong> — গঠন, পার্থক্য ও ব্যবহার</li>
+<li>কোন পরিস্থিতিতে কোন স্টোরেজ বেছে নিতে হয়</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h2>অংশ ক: CDN (Content Delivery Network)</h2>
+<h3>৩.১ CDN কী?</h3>
+<p><strong>CDN (Content Delivery Network)</strong> হলো বিশ্বজুড়ে ছড়িয়ে থাকা সার্ভারের একটি নেটওয়ার্ক, যা ব্যবহারকারীর ভৌগোলিকভাবে কাছাকাছি অবস্থান থেকে কনটেন্ট (বিশেষত স্ট্যাটিক ফাইল — ছবি, ভিডিও, CSS, JS) পরিবেশন করে। লক্ষ্য — latency কমানো, গতি বাড়ানো, এবং মূল সার্ভারের (origin) লোড কমানো।</p>
+<p>মূল ধারণা সহজ: কনটেন্টকে ব্যবহারকারীর কাছে নিয়ে আসো, ব্যবহারকারীকে দূরের সার্ভারে পাঠিও না।</p>
+<h3>৩.২ CDN-এর মূল উপাদান</h3>
+<ul>
+<li><strong>Origin Server (অরিজিন সার্ভার):</strong> আপনার মূল সার্ভার যেখানে কনটেন্টের আসল উৎস (source of truth) থাকে।</li>
+<li><strong>Edge Server (এজ সার্ভার):</strong> ব্যবহারকারীর কাছাকাছি অবস্থিত CDN সার্ভার, যা কনটেন্টের অনুলিপি (cached copy) রাখে এবং পরিবেশন করে।</li>
+<li><strong>PoP (Point of Presence):</strong> একটি ভৌগোলিক অবস্থান (যেমন ঢাকা, সিঙ্গাপুর, লন্ডন) যেখানে একাধিক edge server থাকে। বিশ্বজুড়ে শত শত PoP থাকে।</li>
+<li><strong>Origin Shield:</strong> একটি অতিরিক্ত মধ্যবর্তী caching স্তর, যা origin-কে অনেক edge-এর সরাসরি অনুরোধ থেকে রক্ষা করে (একটিমাত্র shield origin-এ যায়, বহু edge নয়)।</li>
+</ul>
+<h3>৩.৩ CDN কীভাবে কাজ করে (Request Flow)</h3>
+<ol>
+<li>ব্যবহারকারী একটি ফাইল চায় (যেমন <code>image.jpg</code>)।</li>
+<li><strong>DNS / Anycast Routing</strong> ব্যবহারকারীকে সবচেয়ে কাছের PoP-এ পাঠায়।</li>
+<li>Edge server দেখে কনটেন্ট তার কাছে আছে কি না —<br />
+   - <strong>Edge Cache Hit:</strong> আছে → সরাসরি ব্যবহারকারীকে দেয় (অত্যন্ত দ্রুত)।<br />
+   - <strong>Edge Cache Miss:</strong> নেই → origin (বা origin shield) থেকে আনে, edge-এ ক্যাশ করে রাখে, তারপর ব্যবহারকারীকে দেয়। পরের ব্যবহারকারী আর miss পাবে না।</li>
+</ol>
+<blockquote>
+<p><strong>Anycast:</strong> একই IP ঠিকানা বহু সার্ভারে বরাদ্দ; নেটওয়ার্ক রাউটিং স্বয়ংক্রিয়ভাবে নিকটতম সার্ভারে অনুরোধ পাঠায়। এটিই CDN-এর "কাছের সার্ভার খুঁজে দেওয়ার" মূল কৌশল।</p>
+</blockquote>
+<h3>৩.৪ Push CDN vs Pull CDN</h3>
+<p>CDN-এ কনটেন্ট কীভাবে পৌঁছায়, তার দুটি মডেল:</p>
+<p><strong>Pull CDN (সবচেয়ে প্রচলিত):</strong><br />
+কনটেন্ট edge-এ থাকে না; প্রথম ব্যবহারকারী চাইলে (cache miss) CDN নিজে origin থেকে "টেনে আনে" (pull) ও ক্যাশ করে।<br />
+- <em>সুবিধা:</em> কম রক্ষণাবেক্ষণ; শুধু চাহিদা অনুযায়ী কনটেন্ট ক্যাশ হয়; স্টোরেজ সাশ্রয়ী।<br />
+- <em>অসুবিধা:</em> প্রথম অনুরোধে miss (ধীর); জনপ্রিয় নয় এমন কনটেন্টে বারবার origin হিট।<br />
+- <em>ব্যবহার:</em> সাধারণ ওয়েবসাইট, যেখানে কনটেন্ট প্রায়ই বদলায় বা বিশাল।</p>
+<p><strong>Push CDN:</strong><br />
+আপনি আগে থেকেই কনটেন্ট edge সার্ভারে "ঠেলে দেন" (push/upload)। ব্যবহারকারী আসার আগেই কনটেন্ট সেখানে থাকে।<br />
+- <em>সুবিধা:</em> কখনো প্রথম-অনুরোধ miss নেই; বড় ফাইল (যেমন সফটওয়্যার রিলিজ, ভিডিও) আগাম বিতরণে আদর্শ।<br />
+- <em>অসুবিধা:</em> আপনাকেই কনটেন্ট আপলোড ও আপডেট পরিচালনা করতে হয়; বেশি স্টোরেজ খরচ।<br />
+- <em>ব্যবহার:</em> কম-পরিবর্তনশীল, বড়, পূর্বানুমেয় জনপ্রিয় কনটেন্ট।</p>
+<h3>৩.৫ Edge Caching: TTL, Cache-Control ও Purge</h3>
+<ul>
+<li><strong>TTL (Time To Live):</strong> edge-এ কনটেন্ট কতক্ষণ ক্যাশ থাকবে। মেয়াদ শেষে edge আবার origin থেকে যাচাই/আনয় করে।</li>
+<li><strong>Cache-Control Headers:</strong> origin HTTP header দিয়ে CDN-কে নির্দেশ দেয় — <code>Cache-Control: max-age=3600</code> (১ ঘণ্টা ক্যাশ), <code>no-cache</code>, <code>private</code> ইত্যাদি।</li>
+<li><strong>ETag / Last-Modified:</strong> edge origin-কে জিজ্ঞেস করে "কনটেন্ট কি বদলেছে?"; না বদলালে origin <code>304 Not Modified</code> দেয় (ব্যান্ডউইথ সাশ্রয়)।</li>
+<li><strong>Cache Purge / Invalidation:</strong> কনটেন্ট আপডেট হলে পুরোনো edge-ক্যাশ সরাতে হয় —</li>
+<li><strong>Purge by URL:</strong> নির্দিষ্ট ফাইল মুছে ফেলা।</li>
+<li><strong>Purge by Tag/Wildcard:</strong> একদল কনটেন্ট একসাথে মুছে ফেলা।</li>
+<li><strong>Cache Busting (versioned URL):</strong> ফাইলের নামে version দেওয়া (<code>style.v2.css</code> বা <code>style.css?v=2</code>) — নতুন নাম মানে নতুন ক্যাশ; purge-এর প্রয়োজন নেই। এটিই সবচেয়ে নিরাপদ কৌশল।</li>
+</ul>
+<h3>৩.৬ Static vs Dynamic Content</h3>
+<ul>
+<li><strong>Static Content:</strong> সব ব্যবহারকারীর জন্য একই (ছবি, ভিডিও, CSS, JS, ফন্ট) — CDN ক্যাশিংয়ের জন্য আদর্শ।</li>
+<li><strong>Dynamic Content:</strong> প্রতি ব্যবহারকারী/অনুরোধে ভিন্ন (ব্যক্তিগত ড্যাশবোর্ড, API উত্তর) — সরাসরি ক্যাশ করা কঠিন। আধুনিক CDN এর জন্য <strong>Dynamic Content Acceleration</strong> (অপ্টিমাইজড রাউটিং, persistent connection) এবং <strong>Edge Computing</strong> (edge-এ কোড চালানো, যেমন Cloudflare Workers) ব্যবহার করে।</li>
+</ul>
+<h3>৩.৭ CDN-এর নিরাপত্তা ও অন্যান্য সুবিধা</h3>
+<p>CDN শুধু গতি নয়, নিরাপত্তা ও নির্ভরযোগ্যতাও দেয়:<br />
+- <strong>DDoS Protection:</strong> বিশাল distributed নেটওয়ার্ক আক্রমণ শোষণ করে origin রক্ষা করে।<br />
+- <strong>TLS/SSL Termination:</strong> edge-এ এনক্রিপশন সামলানো হয় — origin-এর কাজ কমে।<br />
+- <strong>WAF (Web Application Firewall):</strong> ক্ষতিকর অনুরোধ edge-এই ফিল্টার করা।<br />
+- <strong>Bandwidth Offload:</strong> বেশিরভাগ ট্র্যাফিক edge সামলায়, তাই origin-এর ব্যান্ডউইথ ও খরচ কমে।<br />
+- <strong>High Availability:</strong> একটি PoP ডাউন হলে অন্য PoP কাজ চালিয়ে নেয়।</p>
+<p><strong>জনপ্রিয় CDN:</strong> Cloudflare, Akamai, Amazon CloudFront, Fastly, Google Cloud CDN।</p>
+<hr />
+<h2>অংশ খ: Storage Types (স্টোরেজের ধরন)</h2>
+<p>ক্লাউডে ডাটা তিনভাবে সংরক্ষণ করা যায়। প্রতিটির ভিন্ন বিমূর্ততা (abstraction) ও ব্যবহার আছে।</p>
+<h3>৩.৮ Object Storage (অবজেক্ট স্টোরেজ)</h3>
+<p><strong>Object Storage</strong> হলো এমন স্টোরেজ যেখানে ডাটা "object" হিসেবে রাখা হয় — প্রতিটি object-এ থাকে: <strong>ডাটা (file) + Metadata (মেটাডাটা) + একটি অনন্য ID (key)</strong>। কোনো ফোল্ডার-শ্রেণিবিন্যাস (hierarchy) নেই — একটি সমতল (flat) namespace, যেখানে object গুলো "bucket"-এ থাকে।</p>
+<p>উদাহরণ: <strong>Amazon S3, Google Cloud Storage, Azure Blob Storage।</strong></p>
+<p><strong>বৈশিষ্ট্য:</strong><br />
+- <strong>REST API-ভিত্তিক:</strong> HTTP (GET/PUT) দিয়ে অ্যাক্সেস — ফাইল সিস্টেম mount করতে হয় না।<br />
+- <strong>প্রায় অসীম scalability:</strong> পেটাবাইট পর্যন্ত সহজে বাড়ে।<br />
+- <strong>উচ্চ Durability (স্থায়িত্ব):</strong> ডাটা একাধিক স্থানে প্রতিলিপি (replicated); S3 প্রায় "eleven nines" (99.999999999%) durability দাবি করে।<br />
+- <strong>Metadata সমৃদ্ধ:</strong> প্রতিটি object-এ কাস্টম মেটাডাটা যুক্ত করা যায়।<br />
+- <strong>সাধারণত immutable-ish:</strong> object সম্পূর্ণ প্রতিস্থাপন হয়, আংশিক edit সাধারণত নয়।<br />
+- <em>দুর্বলতা:</em> ফাইলের ভেতরের ছোট অংশ দ্রুত edit করার জন্য নয়; latency block storage-এর চেয়ে বেশি।</p>
+<p><strong>ব্যবহার:</strong> ছবি/ভিডিও, ব্যাকআপ, লগ, স্ট্যাটিক ওয়েবসাইট হোস্টিং, big data ও data lake, CDN-এর origin।</p>
+<h3>৩.৯ Block Storage (ব্লক স্টোরেজ)</h3>
+<p><strong>Block Storage</strong> হলো এমন স্টোরেজ যেখানে ডাটা সমান আকারের "block"-এ ভাগ করে রাখা হয়, এবং এটি একটি কম্পিউটার/সার্ভারে একটি কাঁচা (raw) ভার্চুয়াল হার্ডডিস্কের মতো যুক্ত (attach) হয়। অপারেটিং সিস্টেম এর ওপর ফাইল সিস্টেম তৈরি করে।</p>
+<p>উদাহরণ: <strong>Amazon EBS (Elastic Block Store), Google Persistent Disk, SAN।</strong></p>
+<p><strong>বৈশিষ্ট্য:</strong><br />
+- <strong>অত্যন্ত কম latency ও উচ্চ IOPS:</strong> দ্রুত random read/write।<br />
+- <strong>আংশিক পরিবর্তন সহজ:</strong> ফাইলের নির্দিষ্ট অংশ দ্রুত আপডেট করা যায় (database-এর জন্য আদর্শ)।<br />
+- <strong>সাধারণত একটিমাত্র instance-এ attach হয়</strong> (এক সময়ে এক সার্ভার)।<br />
+- <em>দুর্বলতা:</em> object storage-এর মতো সহজে বিশাল scale বা শেয়ার করা যায় না; খরচ বেশি।</p>
+<p><strong>ব্যবহার:</strong> ডাটাবেস (MySQL, PostgreSQL), boot volume (OS ডিস্ক), transaction-ভারী অ্যাপ্লিকেশন, যেখানে দ্রুত random access দরকার।</p>
+<h3>৩.১০ File Storage (ফাইল স্টোরেজ)</h3>
+<p><strong>File Storage</strong> হলো ঐতিহ্যবাহী শ্রেণিবদ্ধ (hierarchical) ফাইল সিস্টেম — ফোল্ডার ও সাব-ফোল্ডারে ফাইল সাজানো, এবং নেটওয়ার্কের মাধ্যমে একাধিক সার্ভার একসাথে এটি শেয়ার ও mount করতে পারে।</p>
+<p>উদাহরণ: <strong>Amazon EFS, Google Filestore, NFS, SMB/CIFS।</strong></p>
+<p><strong>বৈশিষ্ট্য:</strong><br />
+- <strong>শ্রেণিবদ্ধ গঠন:</strong> পরিচিত ফোল্ডার/পাথ (<code>/home/user/docs/file.txt</code>)।<br />
+- <strong>শেয়ারড অ্যাক্সেস:</strong> একাধিক সার্ভার একসাথে পড়া/লেখা করতে পারে (POSIX-সম্মত)।<br />
+- <strong>সহজ ব্যবহার:</strong> অ্যাপ্লিকেশন একে সাধারণ ফাইল সিস্টেমের মতোই দেখে।<br />
+- <em>দুর্বলতা:</em> object storage-এর মতো অসীম scale নয়; বিশাল হলে খরচ ও জটিলতা বাড়ে।</p>
+<p><strong>ব্যবহার:</strong> শেয়ারড ফাইল (টিমের নথি), legacy অ্যাপ্লিকেশন যা ফাইল সিস্টেম আশা করে, content management, একাধিক সার্ভারের মধ্যে শেয়ারড ডাটা।</p>
+<h3>৩.১১ তিন স্টোরেজের তুলনা</h3>
+<table>
+<thead>
+<tr>
+<th>বৈশিষ্ট্য</th>
+<th>Object Storage</th>
+<th>Block Storage</th>
+<th>File Storage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>গঠন</td>
+<td>Flat (bucket + object)</td>
+<td>Raw blocks</td>
+<td>Hierarchical (folders)</td>
+</tr>
+<tr>
+<td>অ্যাক্সেস</td>
+<td>REST API (HTTP)</td>
+<td>OS-attached volume</td>
+<td>Network mount (NFS/SMB)</td>
+</tr>
+<tr>
+<td>Scalability</td>
+<td>প্রায় অসীম</td>
+<td>সীমিত</td>
+<td>মাঝারি</td>
+</tr>
+<tr>
+<td>Latency</td>
+<td>বেশি</td>
+<td>সবচেয়ে কম</td>
+<td>মাঝারি</td>
+</tr>
+<tr>
+<td>শেয়ারিং</td>
+<td>বহু (URL দিয়ে)</td>
+<td>সাধারণত একটি instance</td>
+<td>বহু সার্ভার</td>
+</tr>
+<tr>
+<td>আংশিক edit</td>
+<td>না (পুরো প্রতিস্থাপন)</td>
+<td>হ্যাঁ</td>
+<td>হ্যাঁ</td>
+</tr>
+<tr>
+<td>উদাহরণ</td>
+<td>S3, GCS, Blob</td>
+<td>EBS, Persistent Disk</td>
+<td>EFS, NFS</td>
+</tr>
+<tr>
+<td>সেরা যেখানে</td>
+<td>মিডিয়া, ব্যাকআপ, data lake</td>
+<td>ডাটাবেস, OS ডিস্ক</td>
+<td>শেয়ারড ফাইল</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>মনে রাখার সূত্র:</strong> Block = "কাঁচা ডিস্ক, এক সার্ভার, দ্রুত" → database। File = "শেয়ারড ফোল্ডার, বহু সার্ভার" → শেয়ারড নথি। Object = "URL দিয়ে যেকোনো জায়গা থেকে, অসীম" → মিডিয়া ও ব্যাকআপ।</p>
+</blockquote>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনি একটি ভিডিও স্ট্রিমিং প্ল্যাটফর্ম বানাচ্ছেন (যেমন একটি ছোট YouTube)। সমস্যা দুটি:</p>
+<p><strong>সমস্যা ১ — স্টোরেজ:</strong> লক্ষ লক্ষ ভিডিও ফাইল কোথায় রাখবেন? ডাটাবেসে? — কখনো না। ভিডিও বিশাল, immutable, এবং URL দিয়ে অ্যাক্সেস করতে হয়। সমাধান: <strong>Object Storage (S3)</strong>। ভিডিও মেটাডাটা (শিরোনাম, ভিউ) ডাটাবেসে, কিন্তু আসল ফাইল object storage-এ।</p>
+<p><strong>সমস্যা ২ — বিতরণ:</strong> ভারতের একজন ব্যবহারকারী যদি প্রতিবার USA-র সার্ভার থেকে ভিডিও আনে, তবে buffering হবে, খরচ বাড়বে, origin চাপে পড়বে। সমাধান: <strong>CDN</strong>। ভিডিও edge সার্ভারে ক্যাশ হয়; ভারতের ব্যবহারকারী ভারতের PoP থেকেই পায় — দ্রুত, সস্তা, মসৃণ।</p>
+<p>এই দুই প্রযুক্তি একসাথে ব্যবহার করেই Netflix, YouTube-এর মতো প্ল্যাটফর্ম বিশ্বজুড়ে কাজ করে। CDN বা সঠিক স্টোরেজ ছাড়া এই স্কেল অসম্ভব।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>CDN অনুরোধ প্রবাহ</h3>
+<pre><code>   ঢাকার ব্যবহারকারী            লন্ডনের ব্যবহারকারী
+         |                            |
+         v                            v
+   +-----------+                +-----------+
+   | Dhaka PoP |                | London PoP|
+   | (Edge)    |                | (Edge)    |
+   +-----------+                +-----------+
+         |  Cache Miss হলে শুধু       |
+         +------------+  +------------+
+                      v  v
+                +----------------+
+                | Origin Shield  |
+                +----------------+
+                        |
+                        v
+                +----------------+
+                | Origin Server  |
+                | (আসল উৎস)      |
+                +----------------+
+</code></pre>
+<h3>Mermaid: CDN Cache Hit/Miss</h3>
+<div class="mermaid">graph TD
+    U[ব্যবহারকারী] --> E{Edge Server<br/>কনটেন্ট আছে?}
+    E -->|Hit| R[দ্রুত পরিবেশন]
+    E -->|Miss| O[Origin থেকে আনা]
+    O --> C[Edge-এ ক্যাশ TTL সহ]
+    C --> R2[ব্যবহারকারীকে ফেরত]</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> ব্যবহারকারী → নিকটতম PoP/Edge → (miss হলে) Origin Shield → Origin।<br />
+- <strong>Request Flow:</strong> Edge-এ hit হলে সরাসরি দ্রুত পরিবেশন; miss হলে origin থেকে এনে edge-এ ক্যাশ করে ফেরত।<br />
+- <strong>Failure Points:</strong> একটি PoP ডাউন হলে রাউটিং অন্য PoP-এ যায়; Origin Shield origin-কে বিপুল edge অনুরোধ থেকে রক্ষা করে।<br />
+- <strong>Scaling:</strong> বেশিরভাগ ট্র্যাফিক edge সামলায়, তাই origin সামান্য লোডেই বিশ্বজুড়ে কোটি ব্যবহারকারীকে সেবা দিতে পারে।</p>
+<h3>Storage নির্বাচন সিদ্ধান্ত</h3>
+<div class="mermaid">graph TD
+    A[ডাটা সংরক্ষণের প্রয়োজন] --> B{কী ধরনের?}
+    B -->|মিডিয়া, ব্যাকআপ, বড় ফাইল| C[Object Storage - S3]
+    B -->|ডাটাবেস, OS ডিস্ক, দ্রুত random access| D[Block Storage - EBS]
+    B -->|বহু সার্ভারে শেয়ারড ফাইল| E[File Storage - EFS/NFS]</div>
+<p><strong>ব্যাখ্যা:</strong> ডাটার প্রকৃতি অনুযায়ী নির্বাচন — মিডিয়া/ব্যাকআপ → Object; database/OS → Block; শেয়ারড ফোল্ডার → File। বড় সিস্টেমে তিনটিই একসাথে ব্যবহৃত হতে পারে।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>Object Storage-এ আপলোড (Python + AWS S3)</h3>
+<pre><code class="language-python">import boto3
+
+s3 = boto3.client('s3')
+
+# একটি ফাইল object হিসেবে আপলোড
+s3.upload_file(
+    Filename='video.mp4',          # লোকাল ফাইল
+    Bucket='my-video-bucket',      # bucket (flat namespace)
+    Key='videos/2024/video.mp4'    # object key (এটি &quot;ফোল্ডার&quot; নয়, শুধু নাম)
+)
+
+# পাবলিক/প্রি-সাইনড URL তৈরি (অস্থায়ী অ্যাক্সেস)
+url = s3.generate_presigned_url(
+    'get_object',
+    Params={'Bucket': 'my-video-bucket', 'Key': 'videos/2024/video.mp4'},
+    ExpiresIn=3600                 # ১ ঘণ্টা বৈধ
+)
+print(url)
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong><br />
+- <code>upload_file</code> ফাইলটিকে একটি object হিসেবে bucket-এ রাখে; <code>Key</code> হলো অনন্য শনাক্তকারী (<code>videos/2024/</code> দেখতে ফোল্ডারের মতো হলেও আসলে flat namespace-এর একটি প্রিফিক্স মাত্র)।<br />
+- <code>generate_presigned_url</code> একটি অস্থায়ী, সময়সীমিত URL দেয় — যা দিয়ে নিরাপদে ফাইল শেয়ার করা যায় bucket পাবলিক না করেই।<br />
+- বাস্তবে এই S3 bucket-কেই CDN-এর (CloudFront) <strong>origin</strong> হিসেবে যুক্ত করা হয়।</p>
+<h3>origin-এ CDN-বান্ধব Cache Header সেট করা (Node.js)</h3>
+<pre><code class="language-javascript">app.get('/static/:file', (req, res) =&gt; {
+  // CDN ও ব্রাউজারকে বলা: ১ দিন ক্যাশ করো
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.sendFile(`/assets/${req.params.file}`);
+});
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> <code>Cache-Control: public, max-age=86400</code> header CDN edge-কে নির্দেশ দেয় ফাইলটি ১ দিন (৮৬,৪০০ সেকেন্ড) ক্যাশ রাখতে — ফলে origin বারবার হিট হয় না। আপডেট করতে চাইলে <strong>cache busting</strong> (<code>?v=2</code>) ব্যবহার করুন, যাতে purge ছাড়াই নতুন সংস্করণ পৌঁছায়।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Netflix (Open Connect):</strong> নিজস্ব CDN তৈরি করেছে — ISP-দের ভেতরেই edge সার্ভার বসিয়ে; বিশ্বের ইন্টারনেট ট্র্যাফিকের একটি বিশাল অংশ এর মাধ্যমে যায়। আসল ভিডিও ফাইল object storage-এ, edge-এ আগাম push করা।</li>
+<li><strong>YouTube / Google:</strong> Google-এর global CDN ও object storage মিলে কোটি কোটি ভিডিও বিশ্বজুড়ে কম latency-তে পরিবেশন করে।</li>
+<li><strong>Amazon (S3 + CloudFront):</strong> অসংখ্য কোম্পানি স্ট্যাটিক ওয়েবসাইট ও মিডিয়া S3-তে রেখে CloudFront দিয়ে বিতরণ করে — একটি ইন্ডাস্ট্রি-স্ট্যান্ডার্ড প্যাটার্ন।</li>
+<li><strong>Cloudflare:</strong> বিশ্বজুড়ে শত শত PoP দিয়ে CDN + নিরাপত্তা (DDoS, WAF) + edge computing (Workers) প্রদান করে — dynamic content acceleration-এর অগ্রদূত।</li>
+<li><strong>Dropbox:</strong> শুরুতে S3-এ ফাইল রাখত, পরে নিজস্ব object storage ("Magic Pocket") তৈরি করে খরচ ও নিয়ন্ত্রণের জন্য।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- ছবি/ভিডিও ডাটাবেসে রাখা (object storage-এর বদলে) — ডাটাবেস ফুলে যায় ও ধীর হয়।<br />
+- সব কনটেন্টকে dynamic ধরে নিয়ে CDN ব্যবহার না করা।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- কনটেন্ট আপডেটের পর CDN cache purge না করা — ব্যবহারকারী পুরোনো সংস্করণ দেখে।<br />
+- ভুল <code>Cache-Control</code> সেট করা (ব্যক্তিগত ডাটায় <code>public</code>, বা স্ট্যাটিক ফাইলে <code>no-cache</code>)।</p>
+<p><strong>Production Mistakes:</strong><br />
+- ভুল স্টোরেজ নির্বাচন — যেমন ডাটাবেস object storage-এ চালানোর চেষ্টা (block লাগত), বা শেয়ারড ফাইলের জন্য একটিমাত্র block volume।<br />
+- ব্যক্তিগত/সংবেদনশীল object পাবলিক bucket-এ রাখা — বড় নিরাপত্তা ছিদ্র (data leak)।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- origin shield না রাখা — cache miss-এ বহু edge একসাথে origin-এ হিট করে (origin overload)।<br />
+- সব edge-এ একই সময়ে TTL শেষ হওয়া (CDN-স্তরের avalanche)।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- dynamic, ব্যক্তিগত API উত্তরকে আক্রমণাত্মকভাবে ক্যাশ করা — এক ব্যবহারকারীর ডাটা অন্যকে দেখানোর ঝুঁকি।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>CDN কী এবং কেন ব্যবহার করা হয়?</em></p>
+<blockquote>
+<p>CDN হলো বিশ্বজুড়ে ছড়ানো edge সার্ভারের নেটওয়ার্ক যা ব্যবহারকারীর কাছাকাছি থেকে কনটেন্ট পরিবেশন করে — latency কমায়, গতি বাড়ায়, origin-এর লোড ও ব্যান্ডউইথ খরচ কমায়, এবং নিরাপত্তা (DDoS protection) দেয়।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Push CDN আর Pull CDN-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>Pull CDN চাহিদা অনুযায়ী origin থেকে কনটেন্ট টেনে আনে (প্রথম অনুরোধে miss); Push CDN-এ আপনি আগে থেকেই কনটেন্ট edge-এ আপলোড করেন (কখনো প্রথম-অনুরোধ miss নেই, কিন্তু বেশি ব্যবস্থাপনা ও স্টোরেজ লাগে)।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Object, Block ও File Storage-এর মূল পার্থক্য কী?</em></p>
+<blockquote>
+<p>Object = flat namespace, REST API, অসীম scale (মিডিয়া/ব্যাকআপ)। Block = কাঁচা ডিস্ক, কম latency, একটি instance (database/OS)। File = শ্রেণিবদ্ধ ফোল্ডার, বহু সার্ভারে শেয়ারড (NFS)।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>CDN-এ কনটেন্ট আপডেট হলে পুরোনো ক্যাশ কীভাবে সামলাবেন?</em></p>
+<blockquote>
+<p>দুটি উপায় — (১) <strong>Cache Purge/Invalidation</strong> দিয়ে নির্দিষ্ট URL বা tag মুছে ফেলা; (২) আরও নিরাপদ — <strong>Cache Busting</strong>: ফাইলের নামে version যোগ করা (<code>app.v2.js</code>), যাতে নতুন URL স্বয়ংক্রিয়ভাবে নতুন ক্যাশ তৈরি করে এবং purge-এর দরকারই হয় না।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি ছবি শেয়ারিং অ্যাপের (যেমন Instagram) স্টোরেজ ও বিতরণ আর্কিটেকচার ডিজাইন করুন।</em></p>
+<blockquote>
+<p>আসল ছবি <strong>Object Storage (S3)</strong>-এ রাখুন; মেটাডাটা (user, caption, likes) <strong>ডাটাবেসে</strong>; ছবির বিভিন্ন রেজোলিউশন আগাম তৈরি করে object storage-এ রাখুন; বিতরণের জন্য <strong>CDN</strong> ব্যবহার করুন যাতে ছবি ব্যবহারকারীর কাছাকাছি edge থেকে দ্রুত আসে; দীর্ঘ TTL ও cache busting দিয়ে দক্ষতা নিশ্চিত করুন।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>স্ট্যাটিক কনটেন্ট সবসময় CDN দিয়ে পরিবেশন করুন</strong> এবং দীর্ঘ TTL দিন।</li>
+<li><strong>Cache Busting (versioned URL)</strong> ব্যবহার করুন — purge-এর ঝামেলা এড়াতে।</li>
+<li><strong>সঠিক স্টোরেজ নির্বাচন করুন</strong> — মিডিয়া→Object, DB→Block, শেয়ারড→File।</li>
+<li><strong>ছবি/ভিডিও ডাটাবেসে নয়, object storage-এ রাখুন</strong>; ডাটাবেসে শুধু মেটাডাটা ও URL।</li>
+<li><strong>Object storage-এ সঠিক অ্যাক্সেস নিয়ন্ত্রণ</strong> — সংবেদনশীল object কখনো পাবলিক করবেন না; presigned URL ব্যবহার করুন।</li>
+<li><strong>Origin Shield ব্যবহার করুন</strong> বড় CDN স্থাপনায় — origin রক্ষায়।</li>
+<li><strong>TLS edge-এ সক্ষম করুন</strong> এবং WAF দিয়ে অনুরোধ ফিল্টার করুন।</li>
+<li><strong>dynamic ও ব্যক্তিগত কনটেন্ট সাবধানে</strong> — হয় ক্যাশ করবেন না, নয়তো ব্যবহারকারী-নির্দিষ্ট key দিয়ে।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>CDN</strong> = বিশ্বজুড়ে edge সার্ভারের নেটওয়ার্ক; latency কমায়, origin রক্ষা করে, নিরাপত্তা দেয়।<br />
+- <strong>উপাদান:</strong> Origin, Edge, PoP, Origin Shield; রাউটিং Anycast/DNS দিয়ে।<br />
+- <strong>Pull CDN</strong> (on-demand, প্রচলিত) vs <strong>Push CDN</strong> (আগাম আপলোড)।<br />
+- <strong>Edge caching:</strong> TTL, Cache-Control, ETag; আপডেটে Purge বা Cache Busting।<br />
+- <strong>নিরাপত্তা:</strong> DDoS protection, TLS termination, WAF, bandwidth offload।<br />
+- <strong>Object Storage</strong> = flat, REST API, অসীম scale, উচ্চ durability (S3) → মিডিয়া/ব্যাকআপ।<br />
+- <strong>Block Storage</strong> = কাঁচা ডিস্ক, কম latency, এক instance (EBS) → database/OS।<br />
+- <strong>File Storage</strong> = শ্রেণিবদ্ধ, শেয়ারড, POSIX (EFS/NFS) → শেয়ারড ফাইল।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> CDN, Edge Server, PoP, Origin, Origin Shield, Anycast, Pull/Push CDN, TTL, Cache-Control, ETag, Purge, Cache Busting, WAF, Object/Block/File Storage, Bucket, Durability, IOPS, Presigned URL, S3, EBS, EFS।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. Pull CDN ও Push CDN-এর পার্থক্য ও কখন কোনটি উপযুক্ত — ব্যাখ্যা করুন।<br />
+2. Object, Block ও File Storage-এর প্রতিটির একটি করে আদর্শ ব্যবহার লিখুন এবং কেন তা ব্যাখ্যা করুন।</p>
+<p><strong>Practical:</strong><br />
+3. একটি স্ট্যাটিক CSS ফাইলের জন্য উপযুক্ত <code>Cache-Control</code> header লিখুন এবং কীভাবে নিরাপদে আপডেট করবেন তা বর্ণনা করুন।<br />
+4. উপরের S3 কোডে একটি ফাংশন যোগ করুন যা একটি object-এর জন্য ১০ মিনিটের presigned URL তৈরি করে।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি বিশ্বব্যাপী ই-লার্নিং প্ল্যাটফর্মের (ভিডিও কোর্স) জন্য সম্পূর্ণ স্টোরেজ + CDN আর্কিটেকচার ডিজাইন করুন — ভিডিও, মেটাডাটা, ও ব্যবহারকারীর আপলোড আলাদাভাবে বিবেচনা করে।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনি একটি লোগো ফাইল আপডেট করলেন, কিন্তু ব্যবহারকারীরা এখনো পুরোনোটি দেখছে। কারণ কী এবং দুটি ভিন্ন সমাধান দিন।</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন একটি প্রোডাকশন ডাটাবেস object storage-এ চালানো উচিত নয়, এবং block storage কেন উপযুক্ত।</p>
+<hr />
+<p><strong>অধ্যায় ৬ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

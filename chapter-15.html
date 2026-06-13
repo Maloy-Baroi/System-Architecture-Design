@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ১৫: Service Discovery, API Gateway, Backend For Frontend (BFF), SAGA Pattern ও CQRS — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html" class="active"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ১৫
+      </div>
+      <div class="page-nav">
+        <a href="chapter-14.html">← আগের অধ্যায়</a>
+        <a href="chapter-16.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ১৫</div>
+      <h1>অধ্যায় ১৫: Service Discovery, API Gateway, Backend For Frontend (BFF), SAGA Pattern ও CQRS</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>এতদিন আমরা microservices-এর মৌলিক উপাদানগুলো একে একে শিখেছি — কীভাবে তারা যোগাযোগ করে (অধ্যায় ৭), message queue দিয়ে decouple হয় (অধ্যায় ৮), এবং distributed transaction-এর চ্যালেঞ্জ (অধ্যায় ১৪)। কিন্তু যখন আপনার ৫টি নয়, ৫০টি বা ৫০০টি সার্ভিস থাকে, তখন কিছু নতুন, কঠিন প্রশ্ন জন্ম নেয় — যেগুলো একটি বা দুটি সার্ভিসে কখনো ভাবতে হয়নি।</p>
+<p>প্রথমত, সার্ভিসগুলো ক্রমাগত উঠছে-নামছে (auto-scaling), তাদের IP বদলাচ্ছে। তাহলে Service A কীভাবে জানবে Service B এই মুহূর্তে কোথায় (কোন IP-তে) আছে? — এর উত্তর <strong>Service Discovery</strong>।</p>
+<p>দ্বিতীয়ত, একটি মোবাইল অ্যাপকে কি ৫০টি সার্ভিসের ৫০টি ঠিকানা জানতে হবে? প্রতিটির authentication, rate limiting আলাদাভাবে সামলাতে হবে? — না, এর সমাধান একটি একক প্রবেশদ্বার: <strong>API Gateway</strong>। আর যখন বিভিন্ন client (মোবাইল, ওয়েব, IoT)-এর ভিন্ন প্রয়োজন, তখন আসে <strong>Backend For Frontend (BFF)</strong>।</p>
+<p>তৃতীয়ত, অধ্যায় ১৪-এ আমরা দেখেছি একাধিক সার্ভিস জুড়ে atomic transaction কঠিন এবং 2PC blocking সমস্যা তৈরি করে। এর আধুনিক সমাধান <strong>SAGA Pattern</strong> — যা এই অধ্যায়ে বিস্তারিত আলোচনা করব।</p>
+<p>চতুর্থত, একটি সিস্টেমে read ও write-এর চাহিদা প্রায়ই খুব ভিন্ন। এদের আলাদা করে অপ্টিমাইজ করার শক্তিশালী প্যাটার্ন <strong>CQRS</strong>।</p>
+<p>এই পাঁচটি প্যাটার্ন একসাথে আধুনিক microservices আর্কিটেকচারের কাঠামো গড়ে তোলে। এগুলো গভীরভাবে বুঝলে আপনি একটি প্রকৃত production-grade distributed system ডিজাইন করতে পারবেন।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি গভীরভাবে বুঝতে ও প্রয়োগ করতে পারবেন:</p>
+<ul>
+<li><strong>Service Discovery</strong> — client-side vs server-side, service registry, health-based discovery</li>
+<li><strong>API Gateway</strong> — দায়িত্ব, প্যাটার্ন, এবং কেন এটি single point of failure না করতে হয়</li>
+<li><strong>Backend For Frontend (BFF)</strong> — কখন ও কেন প্রতিটি client-এর জন্য আলাদা gateway</li>
+<li><strong>SAGA Pattern</strong> — Choreography vs Orchestration, compensating transaction</li>
+<li><strong>CQRS</strong> — read/write মডেল আলাদা করা, কখন উপযুক্ত, Event Sourcing-এর সাথে সম্পর্ক</li>
+<li>এই প্যাটার্নগুলো কীভাবে একসাথে কাজ করে এবং তাদের ট্রেড-অফ</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ Service Discovery — সার্ভিসরা কীভাবে একে অপরকে খুঁজে পায়</h3>
+<p>একটি স্থির (static) জগতে, Service A জানে Service B <code>http://192.168.1.10:8080</code>-এ আছে — কনফিগে হার্ডকোড করা। কিন্তু আধুনিক ক্লাউডে এটি অসম্ভব: সার্ভিস auto-scale করে (নতুন instance যোগ/সরে), crash করে নতুন IP-তে restart হয়, container প্রতিবার নতুন ঠিকানা পায়। তাই IP হার্ডকোড করা মানেই ভাঙন।</p>
+<p><strong>Service Discovery</strong> হলো সেই প্রক্রিয়া যার মাধ্যমে সার্ভিসগুলো রানটাইমে একে অপরের নেটওয়ার্ক অবস্থান (IP+port) গতিশীলভাবে খুঁজে পায়। এর কেন্দ্রে থাকে একটি <strong>Service Registry</strong> — একটি ডাটাবেস যেখানে প্রতিটি চলমান সার্ভিস instance তার ঠিকানা নিবন্ধন (register) করে।</p>
+<p><strong>দুটি প্রধান প্যাটার্ন:</strong></p>
+<p><strong>Client-Side Discovery:</strong><br />
+client (অর্থাৎ caller সার্ভিস) সরাসরি service registry-কে জিজ্ঞেস করে "Service B-এর সুস্থ instance-গুলো কোথায়?", একটি তালিকা পায়, এবং নিজেই একটি বেছে নেয় (নিজে load balancing করে)।<br />
+- <em>সুবিধা:</em> কম network hop (সরাসরি কল); client বুদ্ধিমান load balancing করতে পারে।<br />
+- <em>অসুবিধা:</em> প্রতিটি client-এ discovery লজিক থাকতে হয় (প্রতিটি ভাষায়); registry-র সাথে coupling বাড়ে।<br />
+- <em>উদাহরণ:</em> Netflix Eureka + Ribbon।</p>
+<p><strong>Server-Side Discovery:</strong><br />
+client শুধু একটি load balancer/router-কে অনুরোধ পাঠায়; সেই router registry দেখে সঠিক instance-এ রুট করে। client discovery সম্পর্কে কিছুই জানে না।<br />
+- <em>সুবিধা:</em> client সরল থাকে; discovery লজিক কেন্দ্রীভূত।<br />
+- <em>অসুবিধা:</em> অতিরিক্ত network hop; router একটি গুরুত্বপূর্ণ উপাদান (redundant রাখতে হয়)।<br />
+- <em>উদাহরণ:</em> Kubernetes Service (DNS + kube-proxy), AWS ELB।</p>
+<p><strong>Registration কীভাবে হয়:</strong><br />
+- <strong>Self-Registration:</strong> instance চালু হয়ে নিজে registry-তে register করে এবং নিয়মিত heartbeat পাঠায় (জীবিত আছে জানাতে); heartbeat থামলে registry তাকে সরিয়ে দেয়।<br />
+- <strong>Third-Party Registration:</strong> একটি আলাদা "registrar" (যেমন orchestrator) instance-গুলোর জীবন পর্যবেক্ষণ করে registry আপডেট করে। Kubernetes এভাবে কাজ করে।</p>
+<p><strong>জনপ্রিয় টুল:</strong> Consul, etcd, ZooKeeper, Netflix Eureka, এবং Kubernetes-এর built-in DNS-ভিত্তিক discovery। (লক্ষ্য করুন — registry নিজে strong consistency দরকার, তাই অধ্যায় ১৩-এর consensus এর ভিত্তি।)</p>
+<h3>৩.২ API Gateway — সিস্টেমের একক প্রবেশদ্বার</h3>
+<p>যখন একটি client (মোবাইল/ওয়েব) সরাসরি ডজনখানেক microservice-এর সাথে কথা বলে, অনেক সমস্যা হয়: client-কে সব সার্ভিসের ঠিকানা জানতে হয়; প্রতিটিতে আলাদাভাবে authentication করতে হয়; একটি স্ক্রিন রেন্ডার করতে হয়তো ৭টি আলাদা কল লাগে (chatty, ধীর, বিশেষত মোবাইলে); এবং internal আর্কিটেকচার client-এ ফাঁস হয়ে যায়।</p>
+<p><strong>API Gateway</strong> হলো সব client অনুরোধের একটি একক প্রবেশদ্বার, যা অনুরোধ গ্রহণ করে সঠিক backend সার্ভিসে রুট করে এবং অনেক সাধারণ দায়িত্ব (cross-cutting concern) এক জায়গায় সামলায়।</p>
+<p><strong>API Gateway-এর দায়িত্ব (বাস্তবে যা যা করে):</strong><br />
+- <strong>Routing:</strong> অনুরোধকে সঠিক সার্ভিসে পাঠানো (যেমন <code>/orders/*</code> → Order Service)।<br />
+- <strong>Authentication &amp; Authorization:</strong> এক জায়গায় টোকেন/JWT যাচাই — প্রতিটি সার্ভিসে আলাদা করতে হয় না।<br />
+- <strong>Rate Limiting &amp; Throttling:</strong> অপব্যবহার রোধ (অধ্যায় ১১)।<br />
+- <strong>Request Aggregation / Composition:</strong> একাধিক সার্ভিসের কল একত্র করে একটি client-friendly উত্তর তৈরি (chatty কল কমায়)।<br />
+- <strong>Protocol Translation:</strong> বাইরে REST, ভেতরে gRPC — অনুবাদ করা।<br />
+- <strong>SSL Termination, Caching, Logging, Monitoring, Request/Response transformation।</strong></p>
+<p><strong>মূল সতর্কতা — API Gateway একটি সম্ভাব্য Single Point of Failure ও bottleneck।</strong> তাই এটি অবশ্যই redundant (একাধিক instance) ও scalable হতে হবে; এবং এতে অতিরিক্ত ব্যবসায়িক লজিক না রেখে একে পাতলা (thin) রাখতে হবে — নইলে এটি একটি নতুন মনোলিথে পরিণত হয়।</p>
+<p><strong>জনপ্রিয় টুল:</strong> Kong, AWS API Gateway, NGINX, Apigee, Spring Cloud Gateway, Envoy।</p>
+<h3>৩.৩ Backend For Frontend (BFF)</h3>
+<p>একটি একক API Gateway সব client-কে একই উত্তর দেয়। কিন্তু সমস্যা — একটি মোবাইল অ্যাপের প্রয়োজন একটি ডেস্কটপ ওয়েব অ্যাপ থেকে ভিন্ন। মোবাইলে কম ডাটা, কম কল, ছোট payload দরকার (ব্যান্ডউইথ/ব্যাটারি); ওয়েবে হয়তো বেশি বিস্তারিত ডাটা; একটি smart TV বা IoT-এর আবার ভিন্ন প্রয়োজন।</p>
+<p><strong>BFF (Backend For Frontend)</strong> প্যাটার্নে — একটি সাধারণ gateway-র বদলে <strong>প্রতিটি client টাইপের জন্য একটি আলাদা, উপযোগী backend/gateway</strong> তৈরি করা হয়। যেমন Mobile BFF, Web BFF, IoT BFF। প্রতিটি BFF তার নির্দিষ্ট client-এর প্রয়োজন অনুযায়ী ডাটা একত্র করে, ছাঁটে, ও ফরম্যাট করে।</p>
+<ul>
+<li><em>সুবিধা:</em> প্রতিটি client-এর জন্য অপ্টিমাইজড ও সরল API; frontend টিম তাদের নিজের BFF দ্রুত পরিবর্তন করতে পারে অন্যকে প্রভাবিত না করে; over-fetching কমে।</li>
+<li><em>অসুবিধা:</em> একাধিক BFF মানে কোড ডুপ্লিকেশন ও রক্ষণাবেক্ষণের ভার বাড়ে; সাধারণ লজিক শেয়ার করার পরিকল্পনা লাগে।</li>
+<li><em>কখন:</em> যখন client টাইপগুলোর প্রয়োজন উল্লেখযোগ্যভাবে ভিন্ন। কম client বা সদৃশ প্রয়োজন হলে একটি সাধারণ gateway-ই যথেষ্ট।</li>
+</ul>
+<blockquote>
+<p><strong>সম্পর্ক:</strong> BFF হলো API Gateway প্যাটার্নের একটি বিশেষায়িত রূপ — "এক gateway সবার জন্য"-র বদলে "প্রতি frontend-এর জন্য এক gateway"।</p>
+</blockquote>
+<h3>৩.৪ SAGA Pattern — distributed transaction-এর আধুনিক সমাধান</h3>
+<p>অধ্যায় ১৪-এ আমরা দেখেছি — একাধিক সার্ভিস জুড়ে atomicity দরকার, কিন্তু 2PC blocking ও ধীর। <strong>SAGA</strong> এর সমাধান দেয় ভিন্নভাবে: একটি বড় distributed transaction-কে <strong>ছোট ছোট লোকাল transaction-এর একটি ক্রম</strong> হিসেবে দেখা হয়। প্রতিটি ধাপ তার নিজের সার্ভিসে স্থানীয়ভাবে commit করে এবং পরের ধাপকে ট্রিগার করে।</p>
+<p>মূল চাতুর্য: যদি কোনো ধাপ ব্যর্থ হয়, তাহলে rollback করার বদলে (যা ইতিমধ্যে committed লোকাল transaction-এ সম্ভব নয়), আগের সফল ধাপগুলোর জন্য <strong>Compensating Transaction</strong> চালানো হয় — অর্থাৎ একটি বিপরীত কাজ যা পূর্বের প্রভাব বাতিল করে। যেমন "টাকা কাটা হয়েছিল" → compensation: "টাকা ফেরত দাও"; "পণ্য রিজার্ভ হয়েছিল" → compensation: "রিজার্ভ ছেড়ে দাও"।</p>
+<p><strong>SAGA-এর দুটি বাস্তবায়ন শৈলী:</strong></p>
+<p><strong>১. Choreography (কোরিওগ্রাফি — বিকেন্দ্রীভূত):</strong><br />
+কোনো কেন্দ্রীয় নিয়ন্ত্রক নেই। প্রতিটি সার্ভিস একটি event publish করে, এবং পরের সার্ভিস সেই event শুনে নিজের কাজ করে ও নিজের event publish করে — এভাবে একটি শৃঙ্খল চলে (অধ্যায় ৭-এর event-driven)। ব্যর্থতায় সংশ্লিষ্ট সার্ভিস একটি "failed" event publish করে, যা শুনে আগের সার্ভিসগুলো compensation চালায়।<br />
+- <em>সুবিধা:</em> loose coupling, কোনো single point of failure নেই, সরল ও দ্রুত (কম সার্ভিসে)।<br />
+- <em>অসুবিধা:</em> পুরো প্রবাহ কোথাও স্পষ্ট লেখা নেই — বোঝা ও debug করা কঠিন; cyclic dependency-র ঝুঁকি; বেশি সার্ভিসে জটিল।</p>
+<p><strong>২. Orchestration (অর্কেস্ট্রেশন — কেন্দ্রীভূত):</strong><br />
+একটি কেন্দ্রীয় <strong>Orchestrator</strong> (SAGA coordinator) পুরো প্রবাহ নিয়ন্ত্রণ করে — সে ধাপে ধাপে প্রতিটি সার্ভিসকে কমান্ড পাঠায়, উত্তরের জন্য অপেক্ষা করে, এবং সিদ্ধান্ত নেয় পরের ধাপ নাকি compensation। প্রবাহটি orchestrator-এ একটি state machine হিসেবে স্পষ্ট থাকে।<br />
+- <em>সুবিধা:</em> প্রবাহ স্পষ্ট ও কেন্দ্রীভূত (বোঝা/debug সহজ); জটিল প্রবাহ সামলানো সহজ; cyclic dependency নেই।<br />
+- <em>অসুবিধা:</em> orchestrator একটি অতিরিক্ত উপাদান (redundant রাখতে হয়); সামান্য coupling (orchestrator সব সার্ভিস জানে)।<br />
+- <em>উদাহরণ:</em> Netflix Conductor, Temporal, AWS Step Functions, Camunda।</p>
+<blockquote>
+<p><strong>ব্যবহারিক নিয়ম:</strong> কম ধাপ ও সরল প্রবাহে Choreography; বেশি ধাপ, জটিল শর্ত, বা স্পষ্ট দৃশ্যমানতা দরকার হলে Orchestration। SAGA সর্বদা <strong>eventual consistency</strong> দেয় (তাৎক্ষণিক atomicity নয়) — এটি গ্রহণযোগ্য কি না তা ব্যবসায়িকভাবে নিশ্চিত করুন।</p>
+</blockquote>
+<h3>৩.৫ CQRS — Command Query Responsibility Segregation</h3>
+<p>ঐতিহ্যগতভাবে আমরা একই মডেল (একই টেবিল, একই object) দিয়ে ডাটা পড়ি ও লিখি। কিন্তু read ও write-এর চাহিদা প্রায়ই মৌলিকভাবে ভিন্ন: লেখা (write) সাধারণত normalized, validation-ভারী, ও কম-ঘন; পড়া (read) প্রায়ই অনেক বেশি ঘন, denormalized, ও বিভিন্ন ভিউতে দরকার। একটি মডেল দিয়ে উভয় সামলালে আপস (compromise) করতে হয়।</p>
+<p><strong>CQRS (Command Query Responsibility Segregation)</strong> এই দুটিকে আলাদা করে: <strong>Command</strong> (write — যা state বদলায়) এবং <strong>Query</strong> (read — যা শুধু ডাটা ফেরত দেয়) — দুটির জন্য আলাদা মডেল, এবং প্রায়ই আলাদা ডাটা স্টোর ব্যবহার করা হয়।</p>
+<p><strong>কীভাবে কাজ করে:</strong><br />
+- <strong>Write side (Command):</strong> ব্যবসায়িক নিয়ম ও validation সহ একটি normalized মডেলে লেখা হয় (যেমন একটি RDBMS)।<br />
+- <strong>Read side (Query):</strong> এক বা একাধিক denormalized, query-অপ্টিমাইজড <strong>read model</strong> (যেমন Elasticsearch, একটি denormalized view, বা cache) — যা দ্রুত পড়ার জন্য তৈরি।<br />
+- দুই পক্ষ সিঙ্ক হয় সাধারণত <strong>event</strong> বা replication-এর মাধ্যমে — write হলে একটি event read model আপডেট করে (প্রায়ই asynchronously, তাই <strong>eventual consistency</strong>)।</p>
+<p><strong>সুবিধা:</strong><br />
+- read ও write স্বাধীনভাবে scale করা যায় (যেমন read-heavy সিস্টেমে অনেক read replica)।<br />
+- প্রতিটি দিক তার নিজের জন্য অপ্টিমাইজড (read model দ্রুত query-র জন্য, write model integrity-র জন্য)।<br />
+- একাধিক বিশেষায়িত read view তৈরি করা যায়।</p>
+<p><strong>অসুবিধা / খরচ:</strong><br />
+- উল্লেখযোগ্য জটিলতা ও কোড বৃদ্ধি — দুটি মডেল রক্ষণাবেক্ষণ।<br />
+- read ও write-এর মধ্যে eventual consistency (read সামান্য পুরোনো হতে পারে — UI-তে সামলাতে হয়)।<br />
+- <strong>এটি একটি বিশেষায়িত প্যাটার্ন — সব জায়গায় নয়।</strong> সরল CRUD অ্যাপে CQRS over-engineering। শুধু তখনই ব্যবহার করুন যখন read/write চাহিদা সত্যিই খুব ভিন্ন বা scale খুব বেশি।</p>
+<p><strong>Event Sourcing-এর সাথে সম্পর্ক:</strong> CQRS প্রায়ই Event Sourcing (অধ্যায় ১৬-এ বিস্তারিত)-এর সাথে জোড়ায় ব্যবহৃত হয় — যেখানে সব পরিবর্তন event হিসেবে সংরক্ষিত হয়, এবং সেই event থেকে read model গুলো তৈরি করা হয়। তবে দুটি স্বাধীন প্যাটার্ন — একটি ছাড়া অন্যটি ব্যবহার করা যায়।</p>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনার একটি food delivery অ্যাপ আছে যাতে ডজনখানেক microservice (User, Restaurant, Order, Payment, Delivery, Notification)। একটি অর্ডার দেওয়ার সময় এই প্যাটার্নগুলো কীভাবে একসাথে কাজ করে দেখুন:</p>
+<ol start="১">
+<li>
+<p><strong>মোবাইল অ্যাপ</strong> একটি অনুরোধ পাঠায় — কিন্তু ডজন সার্ভিসের ঠিকানা জানে না, জানার দরকারও নেই। এটি <strong>Mobile BFF</strong>-এ যায় (BFF মোবাইলের জন্য পাতলা, অপ্টিমাইজড payload দেয়)।</p>
+</li>
+<li>
+<p><strong>BFF/API Gateway</strong> টোকেন যাচাই করে (auth), rate limit চেক করে, এবং অর্ডার অনুরোধ Order Service-এ রুট করে।</p>
+</li>
+<li>
+<p>Order Service-এর Payment, Inventory, Delivery — সবার ঠিকানা <strong>Service Discovery</strong> (যেমন Kubernetes DNS/Consul) থেকে রানটাইমে পায় — হার্ডকোড নয়, কারণ এই সার্ভিসগুলো auto-scale করছে।</p>
+</li>
+<li>
+<p>অর্ডার সম্পন্ন করতে payment, inventory reservation, ও delivery assignment — তিনটি সার্ভিস জুড়ে atomicity দরকার। 2PC-র blocking এড়িয়ে এখানে একটি <strong>SAGA (Orchestration)</strong> ব্যবহার করা হয়: orchestrator ধাপে ধাপে payment → inventory → delivery চালায়; inventory ব্যর্থ হলে payment-এ compensating "refund" চালায়। eventual consistency গ্রহণযোগ্য।</p>
+</li>
+<li>
+<p>ব্যবহারকারীর "Order Status" পেজ অত্যন্ত ঘন পড়া হয় (read-heavy), কিন্তু অর্ডার write তুলনায় কম। তাই <strong>CQRS</strong> ব্যবহার করে একটি denormalized read model (যেমন একটি ডকুমেন্ট স্টোর) তৈরি করা হয় — যা সব সার্ভিসের event শুনে অর্ডারের সম্পূর্ণ চিত্র এক জায়গায় রাখে, ফলে status query দ্রুত ও সস্তা।</p>
+</li>
+</ol>
+<p>এই পাঁচটি প্যাটার্ন মিলে সিস্টেমটিকে scalable, maintainable ও resilient করে। প্রতিটির অনুপস্থিতিতে একটি নির্দিষ্ট সমস্যা ফিরে আসে — discovery ছাড়া hardcoded IP ভাঙন, gateway ছাড়া chatty/অনিরাপদ client, SAGA ছাড়া inconsistent অর্ডার, CQRS ছাড়া ধীর status পেজ।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>সম্পূর্ণ চিত্র — Gateway, Discovery, Services</h3>
+<div class="mermaid">graph TD
+    M[Mobile App] --> MB[Mobile BFF]
+    W[Web App] --> WB[Web BFF]
+    MB --> GW[API Gateway<br/>auth, rate limit, routing]
+    WB --> GW
+    GW --> SD{Service Discovery<br/>Registry}
+    SD -.->|কোথায়?| GW
+    GW --> OS[Order Service]
+    GW --> US[User Service]
+    GW --> PS[Payment Service]
+    OS -.->|register/heartbeat| SD
+    PS -.->|register/heartbeat| SD</div>
+<p><strong>ব্যাখ্যা:</strong> client → BFF (client-নির্দিষ্ট) → API Gateway (auth/routing) → সার্ভিস। সার্ভিসগুলো registry-তে register করে; gateway/caller registry থেকে তাদের অবস্থান জানে।</p>
+<h3>SAGA — Orchestration (compensation সহ)</h3>
+<div class="mermaid">graph TD
+    O[Orchestrator] -->|১. charge| P[Payment ✓]
+    O -->|২. reserve| I[Inventory ✗ ব্যর্থ]
+    I -->|ব্যর্থতা জানায়| O
+    O -->|compensate: refund| P
+    O -->|অর্ডার বাতিল| C[Cancelled]</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> এক Orchestrator, একাধিক সার্ভিস।<br />
+- <strong>Flow:</strong> ধাপে ধাপে কমান্ড; payment সফল কিন্তু inventory ব্যর্থ।<br />
+- <strong>Compensation:</strong> rollback সম্ভব নয় (payment committed), তাই compensating "refund" চালিয়ে পূর্বের প্রভাব বাতিল করা হয়।<br />
+- <strong>ট্রেড-অফ:</strong> atomicity-র বদলে eventual consistency; blocking নেই (2PC-র বিপরীতে)।</p>
+<h3>CQRS</h3>
+<div class="mermaid">graph LR
+    CMD[Command/Write] --> WM[(Write Model<br/>normalized, RDBMS)]
+    WM -->|event| SYNC[Sync via events]
+    SYNC --> RM[(Read Model<br/>denormalized, fast)]
+    QRY[Query/Read] --> RM</div>
+<p><strong>ব্যাখ্যা:</strong> লেখা যায় normalized write model-এ; event দিয়ে denormalized read model আপডেট হয় (eventual consistency); পড়া আসে দ্রুত read model থেকে। read ও write স্বাধীনভাবে scale ও অপ্টিমাইজ হয়।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples — প্রোডাকশনে ব্যবহারযোগ্য)</h2>
+<h3>SAGA Orchestrator (Python — ধারণাগত, state machine)</h3>
+<pre><code class="language-python">class OrderSaga:
+    def execute(self, order):
+        completed = []           # সফল ধাপ — ব্যর্থতায় compensate করতে
+        try:
+            payment_id = payment_service.charge(order)      # ধাপ ১
+            completed.append((&quot;payment&quot;, payment_id))
+
+            reservation = inventory_service.reserve(order)  # ধাপ ২
+            completed.append((&quot;inventory&quot;, reservation))
+
+            delivery_id = delivery_service.assign(order)    # ধাপ ৩
+            completed.append((&quot;delivery&quot;, delivery_id))
+
+            return &quot;Order confirmed&quot;
+        except Exception as e:
+            # কোনো ধাপ ব্যর্থ — সফল ধাপগুলো বিপরীত ক্রমে compensate
+            self.compensate(completed)
+            return f&quot;Order failed, rolled back: {e}&quot;
+
+    def compensate(self, completed):
+        for step, ref in reversed(completed):   # বিপরীত ক্রমে undo
+            if step == &quot;payment&quot;:
+                payment_service.refund(ref)            # টাকা ফেরত
+            elif step == &quot;inventory&quot;:
+                inventory_service.release(ref)         # রিজার্ভ ছাড়া
+            elif step == &quot;delivery&quot;:
+                delivery_service.cancel(ref)           # delivery বাতিল
+</code></pre>
+<p><strong>ব্যাখ্যা ও বাস্তব প্রয়োগ:</strong><br />
+- orchestrator ধাপগুলো ক্রমে চালায় এবং প্রতিটি সফল ধাপ <code>completed</code>-এ রাখে।<br />
+- কোনো ধাপ ব্যর্থ হলে <code>compensate</code> সফল ধাপগুলোকে <strong>বিপরীত ক্রমে</strong> undo করে — প্রতিটি ধাপের জন্য একটি নির্দিষ্ট compensating action (refund/release/cancel)।<br />
+- <strong>বাস্তব প্রোডাকশনে:</strong> এই saga state durable-ভাবে (DB-তে) সংরক্ষণ করুন, যাতে orchestrator crash করলেও কোথায় ছিল তা পুনরুদ্ধার করা যায়; প্রতিটি step ও compensation <strong>idempotent</strong> হতে হবে (অধ্যায় ১৪) কারণ retry হতে পারে; timeout ও DLQ যুক্ত করুন। Temporal/Step Functions এসব স্বয়ংক্রিয়ভাবে দেয়।</p>
+<h3>CQRS — read model event দিয়ে আপডেট (Python)</h3>
+<pre><code class="language-python"># Write side — command, normalized write store-এ লেখে + event publish
+def place_order(cmd):
+    order = write_db.insert_order(cmd)          # validation, business rules
+    event_bus.publish(&quot;OrderPlaced&quot;, {
+        &quot;order_id&quot;: order.id, &quot;user&quot;: cmd.user,
+        &quot;items&quot;: cmd.items, &quot;total&quot;: order.total
+    })
+    return order.id
+
+# Read side — event শুনে denormalized read model আপডেট
+def on_order_placed(event):
+    read_db.upsert_order_view({                 # denormalized, query-অপ্টিমাইজড
+        &quot;order_id&quot;: event[&quot;order_id&quot;],
+        &quot;user_name&quot;: lookup_user_name(event[&quot;user&quot;]),  # আগেই join করে রাখা
+        &quot;item_count&quot;: len(event[&quot;items&quot;]),
+        &quot;total&quot;: event[&quot;total&quot;],
+        &quot;status&quot;: &quot;placed&quot;
+    })
+
+# Query side — দ্রুত পড়া, কোনো join নেই
+def get_order_view(order_id):
+    return read_db.find_order_view(order_id)     # এক lookup, অত্যন্ত দ্রুত
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> write side normalized store-এ লেখে ও একটি event publish করে। read side সেই event শুনে একটি <strong>denormalized</strong> view তৈরি করে (যেমন user নাম আগেই যুক্ত করে রাখা) — তাই query-তে কোনো ব্যয়বহুল join লাগে না, পড়া অত্যন্ত দ্রুত। লক্ষ্য করুন read model write-এর সামান্য পরে আপডেট হয় (eventual consistency)।</p>
+<h3>Kubernetes Service Discovery (DNS — সরল, বাস্তব)</h3>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service        # এই নামই DNS হয়ে যায়
+spec:
+  selector:
+    app: payment               # এই label-যুক্ত সব pod-এ load balance
+  ports:
+    - port: 80
+      targetPort: 8080
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> Kubernetes-এ একটি Service তৈরি করলে অন্য সার্ভিস শুধু <code>http://payment-service</code> নামে কল করতে পারে — IP জানার দরকার নেই। Kubernetes ভেতরে DNS + endpoint tracking দিয়ে এই নামকে সুস্থ pod-এর IP-তে রূপান্তর করে (server-side discovery) এবং load balance করে। pod auto-scale/restart-এ IP বদলালেও নাম অপরিবর্তিত — এটিই discovery-র সৌন্দর্য।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Netflix:</strong> Eureka (service discovery), Zuul (API gateway), Conductor (SAGA orchestration) — এই প্যাটার্নগুলোর অনেকগুলোর জনপ্রিয়করণে Netflix অগ্রণী; BFF প্যাটার্নও তাদের বিভিন্ন ডিভাইসের (TV, মোবাইল, ওয়েব) জন্য ব্যবহৃত।</li>
+<li><strong>SoundCloud:</strong> BFF প্যাটার্নের উৎপত্তির সাথে যুক্ত — মোবাইল ও ওয়েবের ভিন্ন প্রয়োজনে আলাদা backend তৈরি করে।</li>
+<li><strong>Uber:</strong> বিশাল microservices fleet-এ service discovery, API gateway, এবং অর্ডার/ট্রিপ প্রবাহে SAGA-জাতীয় প্যাটার্ন ব্যবহার করে।</li>
+<li><strong>Kubernetes (industry standard):</strong> built-in DNS-ভিত্তিক service discovery দিয়ে এই সমস্যা স্ট্যান্ডার্ড করেছে; Istio (service mesh — অধ্যায় ১৬) discovery ও routing আরও উন্নত করে।</li>
+<li><strong>Banking/E-commerce:</strong> অর্ডার ও পেমেন্ট প্রবাহে SAGA + idempotency + outbox ব্যাপকভাবে ব্যবহৃত; অর্ডার status-এ CQRS।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- সার্ভিস IP হার্ডকোড করা — auto-scale/restart-এ ভাঙন।<br />
+- API Gateway-কে single point of failure রেখে দেওয়া (redundant না করা)।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- API Gateway-তে ভারী ব্যবসায়িক লজিক রাখা — এটি একটি নতুন মনোলিথ হয়ে যায়।<br />
+- SAGA-তে compensating transaction ডিজাইন না করা বা সেগুলো idempotent না করা।<br />
+- CQRS-কে সব জায়গায় ব্যবহার করা — সরল CRUD-এ over-engineering।</p>
+<p><strong>Production Mistakes:</strong><br />
+- SAGA orchestrator-এর state durable না রাখা — crash-এ saga "আটকে" বা অর্ধসম্পন্ন থাকে।<br />
+- SAGA-তে eventual consistency-র প্রভাব UI/ব্যবসায় না বোঝা (ব্যবহারকারী মাঝপথের অবস্থা দেখে)।<br />
+- CQRS-এ read model sync ব্যর্থতা/lag মনিটর না করা — stale read নীরবে।<br />
+- service registry-কে redundant/consistent না করা — discovery ব্যর্থ হলে সব সার্ভিস অন্ধ।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- একটি BFF/gateway-তে সব client চাপিয়ে অপ্টিমাইজেশন হারানো; বা উল্টো — অপ্রয়োজনে বহু BFF বানিয়ে রক্ষণাবেক্ষণ বিস্ফোরণ।<br />
+- Choreography SAGA বহু সার্ভিসে ব্যবহার করে প্রবাহ অবোধ্য করে তোলা।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- distributed transaction-এ কোনো কৌশল (SAGA) ছাড়াই কাজ — partial failure-এ inconsistent state।<br />
+- discovery, gateway, SAGA, CQRS — প্রতিটির ট্রেড-অফ না বুঝে "trend" হিসেবে যোগ করা।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>Service Discovery কেন দরকার?</em></p>
+<blockquote>
+<p>আধুনিক ক্লাউডে সার্ভিস auto-scale/restart করে IP বদলায়, তাই হার্ডকোড করা যায় না। Service discovery সার্ভিসগুলোকে রানটাইমে একে অপরের অবস্থান গতিশীলভাবে খুঁজতে দেয়, একটি service registry-র মাধ্যমে।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>API Gateway কী দায়িত্ব পালন করে?</em></p>
+<blockquote>
+<p>একক প্রবেশদ্বার হিসেবে routing, authentication/authorization, rate limiting, request aggregation, protocol translation, SSL termination, logging — এসব cross-cutting concern এক জায়গায় সামলায়, যাতে client সরল থাকে ও সার্ভিসগুলোকে বারবার এসব করতে না হয়।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>BFF প্যাটার্ন কখন ব্যবহার করবেন?</em></p>
+<blockquote>
+<p>যখন বিভিন্ন client টাইপের (মোবাইল/ওয়েব/IoT) প্রয়োজন উল্লেখযোগ্যভাবে ভিন্ন — প্রতিটির জন্য আলাদা, অপ্টিমাইজড backend তৈরি করে। কম বা সদৃশ client হলে একটি সাধারণ gateway-ই যথেষ্ট।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>SAGA-তে Choreography আর Orchestration-এর মধ্যে কীভাবে বাছবেন?</em></p>
+<blockquote>
+<p>Choreography বিকেন্দ্রীভূত (event-driven, কোনো coordinator নেই) — loose coupling ও সরলতা দেয়, কিন্তু প্রবাহ অস্পষ্ট ও বড় সিস্টেমে debug কঠিন। Orchestration কেন্দ্রীভূত (একটি orchestrator) — প্রবাহ স্পষ্ট ও জটিল প্রবাহ সামলানো সহজ, কিন্তু একটি অতিরিক্ত উপাদান। কম/সরল ধাপে Choreography; বেশি/জটিল ধাপে Orchestration।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>CQRS কী এবং এর প্রধান ট্রেড-অফ কী?</em></p>
+<blockquote>
+<p>Command (write) ও Query (read)-এর জন্য আলাদা মডেল (ও প্রায়ই আলাদা স্টোর) ব্যবহার — যাতে প্রতিটি স্বাধীনভাবে scale ও অপ্টিমাইজ হয়। ট্রেড-অফ: উল্লেখযোগ্য জটিলতা ও দুটি মডেলের রক্ষণাবেক্ষণ, এবং read/write-এর মধ্যে eventual consistency। সরল CRUD-এ এটি over-engineering।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি food delivery সিস্টেমের অর্ডার flow ডিজাইন করুন (multiple services সহ)।</em></p>
+<blockquote>
+<p>client → client-নির্দিষ্ট <strong>BFF</strong> → <strong>API Gateway</strong> (auth, rate limit, routing)। সার্ভিসগুলো <strong>Service Discovery</strong> (Kubernetes DNS/Consul) দিয়ে একে অপরকে খুঁজে। অর্ডার সম্পন্নে payment+inventory+delivery জুড়ে <strong>SAGA (Orchestration)</strong> — ব্যর্থতায় compensating refund/release; প্রতিটি step idempotent + outbox দিয়ে নির্ভরযোগ্য event। read-heavy order status-এ <strong>CQRS</strong> — event থেকে denormalized read model। সবই redundant ও monitored।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices — সরাসরি প্রয়োগযোগ্য)</h2>
+<ul>
+<li><strong>IP হার্ডকোড করবেন না</strong> — সর্বদা service discovery (Kubernetes DNS/Consul) ব্যবহার করুন; registry redundant ও consistent রাখুন।</li>
+<li><strong>API Gateway পাতলা (thin) ও redundant রাখুন</strong> — ব্যবসায়িক লজিক সার্ভিসে, gateway-তে নয়।</li>
+<li><strong>BFF শুধু তখনই যখন client প্রয়োজন সত্যিই ভিন্ন</strong> — অপ্রয়োজনে বহু BFF এড়ান।</li>
+<li><strong>microservices-এ atomicity দরকার হলে SAGA</strong> ব্যবহার করুন (2PC নয়); compensating transaction ডিজাইন করুন ও সব step <strong>idempotent</strong> করুন।</li>
+<li><strong>SAGA state durable রাখুন</strong> ও Orchestration-এ Temporal/Step Functions-এর মতো প্রমাণিত টুল বিবেচনা করুন।</li>
+<li><strong>CQRS শুধু যেখানে read/write চাহিদা সত্যিই খুব ভিন্ন</strong> বা scale খুব বেশি; সরল CRUD-এ নয়।</li>
+<li><strong>CQRS/SAGA-তে eventual consistency-র প্রভাব UI ও ব্যবসায় স্পষ্টভাবে সামলান</strong>।</li>
+<li><strong>সব প্যাটার্নের ট্রেড-অফ বুঝে</strong> যোগ করুন, trend হিসেবে নয়; সব কিছু monitor করুন।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Service Discovery</strong> = সার্ভিসরা রানটাইমে একে অপরের অবস্থান খুঁজে পায়; client-side vs server-side; service registry + heartbeat; Consul/etcd/Kubernetes DNS।<br />
+- <strong>API Gateway</strong> = একক প্রবেশদ্বার; routing, auth, rate limit, aggregation, protocol translation; redundant ও thin রাখতে হয়।<br />
+- <strong>BFF</strong> = প্রতি client-টাইপের জন্য আলাদা, অপ্টিমাইজড gateway; ভিন্ন client প্রয়োজনে উপযোগী।<br />
+- <strong>SAGA</strong> = distributed transaction-কে লোকাল transaction-এর ক্রমে ভাগ; ব্যর্থতায় <strong>compensating transaction</strong>; <strong>Choreography</strong> (বিকেন্দ্রীভূত) vs <strong>Orchestration</strong> (কেন্দ্রীভূত); eventual consistency।<br />
+- <strong>CQRS</strong> = read ও write-এর আলাদা মডেল/স্টোর; স্বাধীন scaling ও অপ্টিমাইজেশন; eventual consistency; বিশেষায়িত প্যাটার্ন (সর্বত্র নয়); প্রায়ই Event Sourcing-এর সাথে।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> Service Discovery, Service Registry, Client/Server-Side Discovery, Self/Third-Party Registration, Heartbeat, API Gateway, Cross-Cutting Concern, Request Aggregation, Protocol Translation, BFF, SAGA, Compensating Transaction, Choreography, Orchestration, Orchestrator, CQRS, Command, Query, Write/Read Model, Denormalized, Eventual Consistency, Event Sourcing।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. Client-side ও server-side service discovery-র পার্থক্য ও ট্রেড-অফ লিখুন।<br />
+2. SAGA কীভাবে 2PC-র blocking সমস্যা এড়ায় তা ব্যাখ্যা করুন।</p>
+<p><strong>Practical:</strong><br />
+3. উপরের SAGA orchestrator-এ orchestrator crash-এর পর পুনরুদ্ধারের জন্য কী যোগ করতে হবে — ব্যাখ্যা করুন (durable state)।<br />
+4. একটি ব্লগ সিস্টেমের জন্য CQRS ডিজাইন করুন — write model ও read model আলাদাভাবে বর্ণনা করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি ride-sharing অ্যাপের জন্য সম্পূর্ণ আর্কিটেকচার ডিজাইন করুন যেখানে BFF, API Gateway, Service Discovery ও SAGA সবই ব্যবহার করবেন — প্রতিটির ভূমিকা ব্যাখ্যা করুন।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার Choreography-ভিত্তিক SAGA ৮টি সার্ভিসে ছড়িয়ে গেছে এবং প্রবাহ debug করা প্রায় অসম্ভব হয়ে গেছে। কী সমস্যা এবং কীভাবে সমাধান করবেন?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন CQRS একটি শক্তিশালী কিন্তু "বিপজ্জনক" প্যাটার্ন — কখন এটি সাহায্য করে এবং কখন এটি অপ্রয়োজনীয় জটিলতা যোগ করে।</p>
+<hr />
+<p><strong>অধ্যায় ১৫ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

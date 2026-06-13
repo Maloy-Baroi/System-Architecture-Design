@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ১৮: AWS Fundamentals, Core AWS Services ও Deploying Applications on AWS — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html" class="active"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ১৮
+      </div>
+      <div class="page-nav">
+        <a href="chapter-17.html">← আগের অধ্যায়</a>
+        <a href="chapter-19.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ১৮</div>
+      <h1>অধ্যায় ১৮: AWS Fundamentals, Core AWS Services ও Deploying Applications on AWS</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>এতদিন আমরা সিস্টেম ডিজাইনের তাত্ত্বিক ও স্থাপত্যগত ধারণা শিখেছি — scaling, load balancing, caching, sharding, queue, redundancy। কিন্তু এই সব ধারণা বাস্তবে কোথায় চলে? কোনো একটি ভৌত datacenter-এ আপনি নিজে সার্ভার কিনে, নেটওয়ার্ক বসিয়ে, ঠান্ডা রেখে এগুলো চালাতে পারেন — অথবা একটি <strong>cloud platform</strong> ব্যবহার করতে পারেন, যেখানে এই সব রিসোর্স কয়েক ক্লিকে, ব্যবহার-অনুযায়ী-ভাড়ায় পাওয়া যায়।</p>
+<p><strong>AWS (Amazon Web Services)</strong> হলো বিশ্বের বৃহত্তম ও সবচেয়ে পরিণত cloud platform। আগের অধ্যায়গুলোর প্রায় প্রতিটি ধারণার একটি সরাসরি AWS সেবা আছে — load balancer (ELB), object storage (S3), CDN (CloudFront), managed database (RDS/DynamoDB), message queue (SQS), auto-scaling, এবং আরও অনেক কিছু। এই অধ্যায়ে আমরা শিখব AWS-এর মৌলিক কাঠামো, সবচেয়ে গুরুত্বপূর্ণ সেবাগুলো, এবং কীভাবে একটি বাস্তব অ্যাপ্লিকেশন AWS-এ ডিপ্লয় ও scale করা হয়।</p>
+<p>আমি এই অধ্যায়টি <strong>ব্যবহারিক</strong> রেখেছি — কোন সেবা কী কাজে, কোনটি কখন বাছবেন, এবং কীভাবে একসাথে জুড়ে একটি প্রোডাকশন আর্কিটেকচার গড়বেন — যাতে আপনি সরাসরি কাজে লাগাতে পারেন। (লক্ষ্য করুন: AWS ক্রমাগত নতুন সেবা ও মূল্য যোগ করে; এখানে মূল, স্থিতিশীল ধারণা ও সেবার ভূমিকা শেখানো হয়েছে — নির্দিষ্ট মূল্য/সীমা সবসময় AWS-এর অফিসিয়াল ডকুমেন্টেশনে যাচাই করবেন।)</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি গভীরভাবে বুঝতে ও প্রয়োগ করতে পারবেন:</p>
+<ul>
+<li>Cloud-এর মডেল (<strong>IaaS, PaaS, SaaS</strong>) এবং AWS-এর <strong>Global Infrastructure</strong> (Region, AZ, Edge)</li>
+<li><strong>Shared Responsibility Model</strong> — নিরাপত্তায় কার দায়িত্ব কী</li>
+<li><strong>IAM</strong> — user, role, policy, least privilege</li>
+<li><strong>VPC</strong> — subnet, security group, NAT, internet gateway (cloud networking)</li>
+<li>বিভাগ অনুযায়ী <strong>Core AWS Services</strong> — Compute, Storage, Database, Networking, Messaging, Monitoring, Security</li>
+<li>কোন সেবা কখন বাছবেন (EC2 vs Lambda vs ECS; RDS vs DynamoDB ইত্যাদি)</li>
+<li>বাস্তব <strong>deployment আর্কিটেকচার</strong> — 3-tier, serverless, container, এবং CI/CD ও IaC</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h2>অংশ ক: AWS Fundamentals</h2>
+<h3>৩.১ Cloud মডেল — IaaS, PaaS, SaaS</h3>
+<p>Cloud সেবা তিনটি স্তরে আসে, নিয়ন্ত্রণ ও ব্যবস্থাপনার ভিন্ন মাত্রায়:<br />
+- <strong>IaaS (Infrastructure as a Service):</strong> কাঁচা অবকাঠামো — ভার্চুয়াল সার্ভার, স্টোরেজ, নেটওয়ার্ক। আপনি OS থেকে শুরু করে সব নিয়ন্ত্রণ করেন। <em>উদাহরণ: EC2।</em> সর্বোচ্চ নমনীয়তা, সর্বোচ্চ দায়িত্ব।<br />
+- <strong>PaaS (Platform as a Service):</strong> প্ল্যাটফর্ম দেওয়া হয়; আপনি শুধু কোড ডিপ্লয় করেন, অবকাঠামো AWS সামলায়। <em>উদাহরণ: Elastic Beanstalk, Lambda।</em> কম নিয়ন্ত্রণ, কম ঝামেলা।<br />
+- <strong>SaaS (Software as a Service):</strong> সম্পূর্ণ তৈরি সফটওয়্যার, শুধু ব্যবহার করেন। <em>উদাহরণ: Gmail, একটি AWS-হোস্টেড managed অ্যাপ।</em></p>
+<blockquote>
+<p><strong>মনে রাখুন:</strong> যত উপরে (IaaS → SaaS), তত কম নিয়ন্ত্রণ কিন্তু তত কম operational বোঝা। সঠিক স্তর বাছা একটি গুরুত্বপূর্ণ সিদ্ধান্ত।</p>
+</blockquote>
+<h3>৩.২ AWS Global Infrastructure — Region, AZ, Edge</h3>
+<p>AWS-এর ভৌত অবকাঠামো একটি স্তরবিন্যাসে সাজানো — এটি বোঝা HA ও latency ডিজাইনের (অধ্যায় ১২, ৬) ভিত্তি:</p>
+<ul>
+<li><strong>Region (অঞ্চল):</strong> একটি বৃহৎ ভৌগোলিক এলাকা (যেমন <code>us-east-1</code>, <code>ap-south-1</code> মুম্বাই)। প্রতিটি region ভৌতভাবে আলাদা ও স্বাধীন। আপনি ব্যবহারকারীর কাছাকাছি region বাছেন (কম latency, ও data residency আইনের জন্য)।</li>
+<li><strong>Availability Zone (AZ):</strong> একটি region-এর ভেতরে এক বা একাধিক স্বতন্ত্র datacenter (পৃথক পাওয়ার, কুলিং, নেটওয়ার্ক), কিন্তু একে অপরের কাছাকাছি ও দ্রুত সংযুক্ত। একাধিক AZ-তে ছড়িয়ে ডিপ্লয় করলে একটি AZ-এর বিপর্যয়েও অ্যাপ চলে — এটিই <strong>Multi-AZ</strong> (অধ্যায় ১২)।</li>
+<li><strong>Edge Location:</strong> CDN (CloudFront)-এর জন্য বিশ্বজুড়ে শত শত ছোট পয়েন্ট, যা ব্যবহারকারীর কাছাকাছি কনটেন্ট ক্যাশ করে (অধ্যায় ৬)।</li>
+</ul>
+<blockquote>
+<p><strong>ব্যবহারিক নিয়ম:</strong> প্রোডাকশনে সবসময় অন্তত <strong>দুটি AZ-তে</strong> ডিপ্লয় করুন (HA); ভৌগোলিকভাবে বিতরিত ব্যবহারকারী বা DR-এর জন্য <strong>Multi-Region</strong> বিবেচনা করুন।</p>
+</blockquote>
+<h3>৩.৩ Shared Responsibility Model</h3>
+<p>AWS-এ নিরাপত্তা একটি <strong>ভাগ করা দায়িত্ব</strong>:<br />
+- <strong>AWS দায়ী "of the cloud" (cloud-এর নিরাপত্তা):</strong> ভৌত datacenter, হার্ডওয়্যার, নেটওয়ার্ক অবকাঠামো, হাইপারভাইজার।<br />
+- <strong>আপনি দায়ী "in the cloud" (cloud-এর ভেতরে নিরাপত্তা):</strong> আপনার ডাটা, OS প্যাচিং (EC2-তে), নেটওয়ার্ক কনফিগ (security group), IAM, এনক্রিপশন, অ্যাপ্লিকেশন নিরাপত্তা।</p>
+<p>এটি বোঝা গুরুত্বপূর্ণ — অনেক নিরাপত্তা ঘটনা ঘটে কারণ ব্যবহারকারী ভাবে AWS সব সামলাচ্ছে, কিন্তু আসলে কনফিগারেশন (যেমন একটি পাবলিক S3 bucket) তাদেরই দায়িত্ব।</p>
+<h3>৩.৪ IAM — Identity and Access Management</h3>
+<p><strong>IAM</strong> হলো AWS-এ কে কী করতে পারবে তা নিয়ন্ত্রণের সেবা — নিরাপত্তার ভিত্তি। মূল উপাদান:<br />
+- <strong>User:</strong> একজন ব্যক্তি বা অ্যাপ্লিকেশনের পরিচয় (দীর্ঘমেয়াদি credential)।<br />
+- <strong>Group:</strong> user-দের একটি সংগ্রহ (একসাথে permission দেওয়ার জন্য)।<br />
+- <strong>Role:</strong> একটি অস্থায়ী পরিচয় যা assume করা যায় — <em>বিশেষত গুরুত্বপূর্ণ:</em> একটি EC2 instance বা Lambda-কে role দিলে, তার ভেতরের কোড নিরাপদে অন্য AWS সেবা (যেমন S3) অ্যাক্সেস করতে পারে — <strong>হার্ডকোডেড credential ছাড়াই</strong>। এটিই প্রস্তাবিত পদ্ধতি।<br />
+- <strong>Policy:</strong> JSON ডকুমেন্টে লেখা অনুমতির নিয়ম (কোন action, কোন resource-এ, allow/deny)।</p>
+<blockquote>
+<p><strong>সবচেয়ে গুরুত্বপূর্ণ নীতি — Least Privilege:</strong> প্রতিটি পরিচয়কে শুধু ততটুকু অনুমতি দিন যতটুকু তার কাজে দরকার, এর বেশি নয়। অতিরিক্ত অনুমতি নিরাপত্তা ছিদ্র। কখনো credential কোডে হার্ডকোড করবেন না — role ব্যবহার করুন।</p>
+</blockquote>
+<h3>৩.৫ VPC — Cloud Networking</h3>
+<p><strong>VPC (Virtual Private Cloud)</strong> হলো AWS-এর ভেতরে আপনার নিজস্ব, বিচ্ছিন্ন ভার্চুয়াল নেটওয়ার্ক — যেখানে আপনি সম্পূর্ণ নিয়ন্ত্রণে নিজের IP পরিসর, subnet ও রাউটিং সাজান। প্রোডাকশন আর্কিটেকচারে এটি অপরিহার্য। মূল উপাদান:<br />
+- <strong>Subnet:</strong> VPC-কে ছোট নেটওয়ার্ক খণ্ডে ভাগ করা, প্রায়ই প্রতি AZ-তে একটি করে।<br />
+  - <strong>Public Subnet:</strong> ইন্টারনেট থেকে সরাসরি পৌঁছানো যায় (যেমন load balancer, bastion host এখানে)।<br />
+  - <strong>Private Subnet:</strong> ইন্টারনেট থেকে সরাসরি পৌঁছানো যায় না (যেমন অ্যাপ সার্ভার, ডাটাবেস — নিরাপত্তার জন্য এখানে)।<br />
+- <strong>Internet Gateway (IGW):</strong> VPC-কে ইন্টারনেটের সাথে যুক্ত করে (public subnet-এর জন্য)।<br />
+- <strong>NAT Gateway:</strong> private subnet-এর রিসোর্সকে বাইরে যেতে দেয় (যেমন প্যাকেজ ডাউনলোড) কিন্তু বাইরে থেকে ভেতরে আসতে দেয় না — নিরাপত্তা রক্ষা করে।<br />
+- <strong>Security Group:</strong> instance-স্তরের একটি stateful ফায়ারওয়াল — কোন পোর্টে কোন ট্র্যাফিক ঢুকবে/বের হবে (যেমন "শুধু পোর্ট 443 খোলা")।<br />
+- <strong>NACL (Network ACL):</strong> subnet-স্তরের একটি stateless ফায়ারওয়াল (অতিরিক্ত স্তর)।</p>
+<blockquote>
+<p><strong>প্রস্তাবিত প্যাটার্ন:</strong> load balancer public subnet-এ; অ্যাপ সার্ভার ও ডাটাবেস private subnet-এ; security group দিয়ে কঠোরভাবে শুধু প্রয়োজনীয় ট্র্যাফিক অনুমোদন। ডাটাবেস কখনো সরাসরি ইন্টারনেট-এক্সপোজড নয়।</p>
+</blockquote>
+<h2>অংশ খ: Core AWS Services (বিভাগ অনুযায়ী)</h2>
+<h3>৩.৬ Compute (গণনা)</h3>
+<ul>
+<li><strong>EC2 (Elastic Compute Cloud):</strong> ভার্চুয়াল সার্ভার (IaaS)। সম্পূর্ণ নিয়ন্ত্রণ (OS, কনফিগ)। বিভিন্ন instance type (compute/memory/GPU-অপ্টিমাইজড)। Pricing: On-Demand (নমনীয়), Reserved/Savings Plan (দীর্ঘমেয়াদে সস্তা), Spot (অব্যবহৃত ক্ষমতা, খুব সস্তা কিন্তু যেকোনো সময় বন্ধ হতে পারে)।</li>
+<li><strong>Lambda (Serverless):</strong> কোনো সার্ভার ব্যবস্থাপনা নেই — শুধু একটি ফাংশন লেখেন, এটি event-এ (HTTP, queue message, file upload) চলে এবং শুধু চলার সময়টুকুর জন্য পেমেন্ট। auto-scale স্বয়ংক্রিয়। <em>আদর্শ:</em> event-driven, sporadic, বা অপ্রত্যাশিত workload।</li>
+<li><strong>ECS / EKS (Containers):</strong> container অর্কেস্ট্রেশন — <strong>ECS</strong> (AWS-এর নিজস্ব), <strong>EKS</strong> (managed Kubernetes)। <strong>Fargate</strong> = serverless container (instance ব্যবস্থাপনা ছাড়াই container চালানো)।</li>
+<li><strong>Elastic Beanstalk (PaaS):</strong> কোড আপলোড করলে AWS স্বয়ংক্রিয়ভাবে EC2, load balancer, scaling সব সেট করে — সরল ডিপ্লয়মেন্ট।</li>
+</ul>
+<blockquote>
+<p><strong>কখন কোনটি:</strong> পূর্ণ নিয়ন্ত্রণ/legacy → EC2; event-driven/সরল API → Lambda; container-ভিত্তিক microservices → ECS/EKS (+Fargate); দ্রুত সরল ডিপ্লয় → Beanstalk।</p>
+</blockquote>
+<h3>৩.৭ Storage (স্টোরেজ — অধ্যায় ৬-এর সাথে)</h3>
+<ul>
+<li><strong>S3 (Simple Storage Service):</strong> <strong>Object storage</strong> — ছবি, ভিডিও, ব্যাকআপ, স্ট্যাটিক ওয়েবসাইট, data lake। প্রায় অসীম, উচ্চ durability। বিভিন্ন storage class (Standard, Infrequent Access, Glacier — কম-ব্যবহৃত ডাটার জন্য সস্তা archival)।</li>
+<li><strong>EBS (Elastic Block Store):</strong> <strong>Block storage</strong> — EC2-তে যুক্ত করা ভার্চুয়াল ডিস্ক (database, OS volume)। কম latency, একটি instance-এ attach।</li>
+<li><strong>EFS (Elastic File System):</strong> <strong>File storage</strong> — একাধিক EC2-তে শেয়ারড নেটওয়ার্ক ফাইল সিস্টেম (NFS)।</li>
+</ul>
+<h3>৩.৮ Database (ডাটাবেস — অধ্যায় ৪-এর সাথে)</h3>
+<ul>
+<li><strong>RDS (Relational Database Service):</strong> managed SQL ডাটাবেস (MySQL, PostgreSQL, etc.) — AWS প্যাচিং, ব্যাকআপ, Multi-AZ failover সামলায় (অধ্যায় ১২)। <strong>Aurora</strong> = AWS-এর নিজস্ব উচ্চ-পারফরম্যান্স, MySQL/PostgreSQL-সঙ্গতিপূর্ণ ডাটাবেস (দ্রুত failover, auto-scaling storage)।</li>
+<li><strong>DynamoDB:</strong> managed <strong>NoSQL</strong> (key-value/document) — প্রায় অসীম scale, single-digit millisecond latency, serverless (অধ্যায় ৪, ১৩-এর AP/eventual consistency, tunable)। <em>আদর্শ:</em> বিশাল scale, সরল অ্যাক্সেস প্যাটার্ন।</li>
+<li><strong>ElastiCache:</strong> managed <strong>Redis/Memcached</strong> (অধ্যায় ৫) — caching ও session স্টোর।</li>
+<li><strong>Redshift:</strong> managed data warehouse — বিশাল analytics query (OLAP)।</li>
+</ul>
+<blockquote>
+<p><strong>কখন কোনটি:</strong> জটিল সম্পর্ক/লেনদেন → RDS/Aurora; বিশাল scale + সরল প্যাটার্ন → DynamoDB; caching → ElastiCache; analytics → Redshift।</p>
+</blockquote>
+<h3>৩.৯ Networking &amp; Content Delivery</h3>
+<ul>
+<li><strong>Route 53:</strong> managed <strong>DNS</strong> + health-check-ভিত্তিক <strong>DNS failover</strong> ও geo-routing (অধ্যায় ১২)।</li>
+<li><strong>CloudFront:</strong> <strong>CDN</strong> — edge location থেকে কনটেন্ট বিতরণ (অধ্যায় ৬); প্রায়ই S3-এর সামনে।</li>
+<li><strong>ELB (Elastic Load Balancing):</strong> <strong>ALB</strong> (Application LB — L7, HTTP, path/host routing), <strong>NLB</strong> (Network LB — L4, অতি-উচ্চ পারফরম্যান্স), <strong>CLB</strong> (পুরোনো)। অধ্যায় ১০-এর L4/L7 সরাসরি এখানে।</li>
+<li><strong>API Gateway:</strong> managed <strong>API Gateway</strong> (অধ্যায় ১৫) — routing, auth, rate limiting, প্রায়ই Lambda-র সামনে।</li>
+</ul>
+<h3>৩.১০ Messaging (অধ্যায় ৮-এর সাথে)</h3>
+<ul>
+<li><strong>SQS:</strong> managed <strong>message queue</strong> (Standard/FIFO) — decoupling ও async।</li>
+<li><strong>SNS:</strong> managed <strong>Pub/Sub</strong> notification — fan-out (SNS→multiple SQS প্যাটার্ন)।</li>
+<li><strong>Kinesis:</strong> real-time <strong>streaming</strong> (Kafka-র মতো) — বিশাল ডাটা স্ট্রিম, analytics।</li>
+<li><strong>EventBridge:</strong> event bus — সার্ভিস ও SaaS-এর মধ্যে event-driven integration।</li>
+</ul>
+<h3>৩.১১ Monitoring, Security ও IaC</h3>
+<ul>
+<li><strong>CloudWatch:</strong> metrics, logs, alarms, dashboards — auto-scaling trigger ও observability (অধ্যায় ৯, ১২)।</li>
+<li><strong>CloudTrail:</strong> সব AWS API কল-এর audit log (কে কী করল)।</li>
+<li><strong>Security:</strong> <strong>KMS</strong> (এনক্রিপশন কী ব্যবস্থাপনা), <strong>Secrets Manager</strong> (password/API key নিরাপদে সংরক্ষণ — কখনো কোডে নয়), <strong>WAF</strong> (web application firewall — অধ্যায় ৬), <strong>Shield</strong> (DDoS protection)।</li>
+<li><strong>IaC (Infrastructure as Code):</strong> <strong>CloudFormation</strong> (YAML/JSON-এ পুরো অবকাঠামো সংজ্ঞায়িত), <strong>CDK</strong> (কোড দিয়ে অবকাঠামো — Python/TS)। Terraform (তৃতীয় পক্ষ) ব্যাপকভাবে ব্যবহৃত। <em>গুরুত্ব:</em> অবকাঠামো ম্যানুয়ালি ক্লিক করে নয়, কোডে সংজ্ঞায়িত করলে তা reproducible, version-controlled ও নিরাপদ।</li>
+</ul>
+<h2>অংশ গ: Deploying Applications on AWS</h2>
+<h3>৩.১২ তিনটি সাধারণ deployment মডেল</h3>
+<p><strong>১. ক্লাসিক 3-Tier (EC2-ভিত্তিক):</strong><br />
+সবচেয়ে প্রচলিত প্রথাগত আর্কিটেকচার (অধ্যায় ৩-এর 3-tier, AWS-এ):<br />
+- Route 53 (DNS) → CloudFront (CDN) → <strong>ALB</strong> (public subnet)<br />
+- ALB → <strong>Auto Scaling Group</strong>-এর EC2 instance (private subnet, একাধিক AZ — অধ্যায় ৯, ১২)<br />
+- EC2 → <strong>RDS Multi-AZ</strong> (private subnet) + <strong>ElastiCache</strong> (caching)<br />
+- স্ট্যাটিক asset → <strong>S3 + CloudFront</strong></p>
+<p><strong>২. Serverless:</strong><br />
+কোনো সার্ভার ব্যবস্থাপনা নেই, ব্যবহার-অনুযায়ী খরচ:<br />
+- CloudFront → <strong>API Gateway</strong> → <strong>Lambda</strong> → <strong>DynamoDB</strong><br />
+- স্ট্যাটিক frontend → S3 + CloudFront<br />
+- <em>আদর্শ:</em> পরিবর্তনশীল/অপ্রত্যাশিত traffic, দ্রুত শুরু, কম operational বোঝা; কিন্তু cold start ও vendor lock-in বিবেচনা।</p>
+<p><strong>৩. Container-based (microservices):</strong><br />
+- ECR (container registry)-এ image; <strong>ECS/EKS</strong> (+Fargate) container চালায়; ALB ট্র্যাফিক বণ্টন; service discovery; CloudWatch monitoring — অধ্যায় ১৫/১৬-এর microservices প্যাটার্ন AWS-এ।</p>
+<h3>৩.১৩ CI/CD ও Deployment কৌশল</h3>
+<p>কোড থেকে প্রোডাকশনে স্বয়ংক্রিয়ভাবে পৌঁছানোর pipeline:<br />
+- <strong>CodeCommit/GitHub</strong> (source) → <strong>CodeBuild</strong> (build/test) → <strong>CodeDeploy</strong> (deploy) → <strong>CodePipeline</strong> (পুরো প্রবাহ অর্কেস্ট্রেট)।<br />
+- <strong>Deployment কৌশল:</strong> <strong>Rolling</strong> (ধীরে ধীরে instance আপডেট), <strong>Blue-Green</strong> (পুরোনো ও নতুন পরিবেশ পাশাপাশি, এক ঝটকায় switch — দ্রুত rollback), <strong>Canary</strong> (অল্প ট্র্যাফিক নতুন সংস্করণে আগে — অধ্যায় ১৬)।</p>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনাকে একটি ই-কমার্স অ্যাপ AWS-এ ডিপ্লয় করতে বলা হলো, যা সাধারণ দিনে কম traffic কিন্তু সেল-এ ২০ গুণ traffic পায়, এবং HA ও নিরাপত্তা অপরিহার্য।</p>
+<p>আগের সব অধ্যায়ের ধারণা AWS সেবায় ম্যাপ করে একটি সম্পূর্ণ সমাধান দাঁড়ায়:<br />
+- ব্যবহারকারী → <strong>Route 53</strong> (DNS) → <strong>CloudFront</strong> (CDN — স্ট্যাটিক asset ও ছবি দ্রুত, অধ্যায় ৬)।<br />
+- ডাইনামিক অনুরোধ → <strong>ALB</strong> (L7 load balancer, public subnet, অধ্যায় ১০)।<br />
+- ALB → <strong>Auto Scaling Group</strong>-এর EC2 (private subnet, ২+ AZ) — সেল-এ CPU বাড়লে স্বয়ংক্রিয়ভাবে আরও instance (অধ্যায় ৯), সার্ভার stateless (session <strong>ElastiCache/Redis</strong>-এ, অধ্যায় ৯)।<br />
+- ডাটা → <strong>RDS Multi-AZ</strong> (primary + standby, automatic failover, অধ্যায় ১২) জটিল/transaction ডাটার জন্য; <strong>DynamoDB</strong> কার্ট/সেশনের জন্য (অধ্যায় ৪)।<br />
+- ছবি/ভিডিও → <strong>S3</strong> (object storage) + CloudFront।<br />
+- ভারী কাজ (ইমেল, অর্ডার প্রক্রিয়া) → <strong>SQS + Lambda/Worker</strong> (async, অধ্যায় ৮)।<br />
+- নিরাপত্তা → <strong>VPC</strong> (private subnet-এ DB/app), <strong>Security Group</strong> (কঠোর), <strong>IAM role</strong> (হার্ডকোডেড credential নয়), <strong>Secrets Manager</strong> (DB password), <strong>WAF + Shield</strong> (CloudFront-এ DDoS/আক্রমণ রোধ)।<br />
+- observability → <strong>CloudWatch</strong> (metrics, alarm, auto-scaling trigger)।<br />
+- পুরো অবকাঠামো → <strong>CloudFormation/Terraform</strong> (IaC — reproducible, version-controlled)।<br />
+- ডিপ্লয় → <strong>CodePipeline</strong> + blue-green/canary।</p>
+<p>এই একটি আর্কিটেকচারে পুরো বইয়ের ধারণা একসাথে বাস্তব AWS সেবায় রূপ নেয় — এবং এটিই একটি বাস্তব প্রোডাকশন ই-কমার্স ডিপ্লয়মেন্টের কাঠামো।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>সম্পূর্ণ 3-Tier AWS আর্কিটেকচার</h3>
+<div class="mermaid">graph TD
+    U[ব্যবহারকারী] --> R53[Route 53 - DNS]
+    R53 --> CF[CloudFront CDN + WAF]
+    CF --> S3[(S3 - স্ট্যাটিক/মিডিয়া)]
+    CF --> ALB[ALB - public subnet]
+    subgraph VPC
+    subgraph Public Subnet
+    ALB
+    end
+    subgraph Private Subnet AZ-1
+    E1[EC2 ASG]
+    end
+    subgraph Private Subnet AZ-2
+    E2[EC2 ASG]
+    end
+    ALB --> E1
+    ALB --> E2
+    E1 --> RDS[(RDS Multi-AZ)]
+    E2 --> RDS
+    E1 --> EC[(ElastiCache Redis)]
+    E2 --> EC
+    E1 --> SQS[SQS Queue]
+    end
+    SQS --> W[Worker / Lambda]</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> DNS, CDN+WAF, ALB (public), EC2 ASG (private, ২ AZ), RDS Multi-AZ, ElastiCache, SQS+Worker।<br />
+- <strong>Flow:</strong> ব্যবহারকারী → DNS → CDN (স্ট্যাটিক) বা → ALB → EC2 → DB/cache; ভারী কাজ SQS-এ async।<br />
+- <strong>Failure Points:</strong> একটি AZ মারা গেলে অন্য AZ-এর EC2 ও RDS standby কাজ চালায় (HA)। ALB ও CloudFront নিজে redundant।<br />
+- <strong>Scaling:</strong> ASG traffic অনুযায়ী EC2 যোগ/সরায়; stateless সার্ভার (session ElastiCache-এ) এটি সম্ভব করে।</p>
+<h3>Serverless আর্কিটেকচার</h3>
+<div class="mermaid">graph LR
+    U[Client] --> CF[CloudFront]
+    CF --> S3[(S3 - frontend)]
+    CF --> AG[API Gateway]
+    AG --> L[Lambda functions]
+    L --> D[(DynamoDB)]
+    L --> SNS[SNS/SQS - async]</div>
+<p><strong>ব্যাখ্যা:</strong> কোনো সার্ভার ব্যবস্থাপনা নেই — API Gateway অনুরোধ Lambda-তে রুট করে, Lambda DynamoDB-তে কাজ করে ও auto-scale করে; ব্যবহার-অনুযায়ী খরচ। পরিবর্তনশীল traffic ও দ্রুত শুরুর জন্য আদর্শ।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples — প্রোডাকশনে ব্যবহারযোগ্য)</h2>
+<h3>IAM Least-Privilege Policy (JSON)</h3>
+<pre><code class="language-json">{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [{
+    &quot;Effect&quot;: &quot;Allow&quot;,
+    &quot;Action&quot;: [&quot;s3:GetObject&quot;, &quot;s3:PutObject&quot;],
+    &quot;Resource&quot;: &quot;arn:aws:s3:::my-app-bucket/*&quot;
+  }]
+}
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> এই policy শুধু একটি নির্দিষ্ট bucket-এ object পড়া/লেখার অনুমতি দেয় — আর কিছুই নয় (least privilege)। এটি একটি <strong>IAM role</strong>-এ যুক্ত করে EC2/Lambda-তে দিলে, কোড হার্ডকোডেড credential ছাড়াই S3 অ্যাক্সেস করতে পারে। কখনো <code>"Action": "*"</code> বা <code>"Resource": "*"</code> দেবেন না যদি না সত্যিই দরকার।</p>
+<h3>Lambda ফাংশন (Python — serverless)</h3>
+<pre><code class="language-python">import json, boto3
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('Orders')
+
+def handler(event, context):
+    # API Gateway থেকে আসা অনুরোধ
+    body = json.loads(event['body'])
+    table.put_item(Item={                  # DynamoDB-তে লেখা
+        'order_id': body['order_id'],
+        'user_id': body['user_id'],
+        'amount': body['amount']
+    })
+    return {
+        'statusCode': 201,
+        'body': json.dumps({'status': 'created'})
+    }
+    # কোনো সার্ভার নেই — AWS স্বয়ংক্রিয়ভাবে scale করে, শুধু execution-এর খরচ
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> এই Lambda একটি API Gateway অনুরোধে চলে, DynamoDB-তে অর্ডার লেখে, ও উত্তর দেয়। কোনো সার্ভার ব্যবস্থাপনা নেই; traffic বাড়লে AWS স্বয়ংক্রিয়ভাবে অনেক copy চালায়। DynamoDB অ্যাক্সেস হয় Lambda-র <strong>IAM role</strong> দিয়ে (credential ছাড়াই)। <em>বিবেচনা:</em> cold start (প্রথম invocation-এ সামান্য বিলম্ব)।</p>
+<h3>CloudFormation IaC (YAML — reproducible অবকাঠামো)</h3>
+<pre><code class="language-yaml">Resources:
+  MyBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: my-app-static-assets
+      PublicAccessBlockConfiguration:    # নিরাপত্তা: পাবলিক অ্যাক্সেস ব্লক
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+
+  MyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Orders
+      BillingMode: PAY_PER_REQUEST       # auto-scale, ব্যবহার-অনুযায়ী
+      AttributeDefinitions:
+        - { AttributeName: order_id, AttributeType: S }
+      KeySchema:
+        - { AttributeName: order_id, KeyType: HASH }
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> এই YAML একটি S3 bucket ও একটি DynamoDB table সংজ্ঞায়িত করে — ম্যানুয়ালি console-এ ক্লিক না করে। সুবিধা: এটি <strong>version-controlled</strong> (Git-এ), <strong>reproducible</strong> (একই কনফিগ বারবার ডিপ্লয়), এবং নিরাপদ (যেমন <code>PublicAccessBlock</code> দিয়ে ভুলবশত পাবলিক bucket রোধ)। প্রোডাকশনে সব অবকাঠামো এভাবে IaC-তে রাখুন — ম্যানুয়াল পরিবর্তন এড়ান।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Netflix:</strong> সম্পূর্ণভাবে AWS-এ চলে — EC2, S3, auto-scaling, ও বিশাল microservices fleet; AWS-এর সবচেয়ে বিখ্যাত বড় গ্রাহক।</li>
+<li><strong>Airbnb, Lyft, Pinterest:</strong> AWS-এ scale করেছে — RDS/Aurora, DynamoDB, S3, ElastiCache, ও container/serverless মিশ্রণ ব্যবহার করে।</li>
+<li><strong>Serverless adoption:</strong> অনেক স্টার্টআপ ও এন্টারপ্রাইজ Lambda + API Gateway + DynamoDB দিয়ে দ্রুত, কম-operational অ্যাপ বানায় (যেমন event-driven পাইপলাইন)।</li>
+<li><strong>Capital One (ব্যাংকিং):</strong> AWS-এ বড় আকারে স্থানান্তরিত — দেখায় নিয়ন্ত্রিত শিল্পেও cloud নিরাপদে ব্যবহার সম্ভব (IAM, KMS, VPC, compliance সহ)।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- credential কোডে হার্ডকোড করা — IAM role ব্যবহার না করা।<br />
+- ডাটাবেস public subnet-এ বা সরাসরি ইন্টারনেট-এক্সপোজড রাখা।<br />
+- S3 bucket ভুলবশত পাবলিক রাখা — ডাটা ফাঁস।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- শুধু একটি AZ-তে ডিপ্লয় — HA ছাড়া (একটি AZ মারা গেলে পুরো অ্যাপ ডাউন)।<br />
+- least privilege উপেক্ষা করে অতিরিক্ত wide IAM permission (<code>*</code>)।<br />
+- ভুল সেবা পছন্দ — যেমন সরল API-তে EC2 fleet (যেখানে Lambda যথেষ্ট), বা বিশাল scale-এ ভুল ডাটাবেস।</p>
+<p><strong>Production Mistakes:</strong><br />
+- অবকাঠামো ম্যানুয়ালি console-এ তৈরি (IaC ছাড়া) — অ-reproducible, ভুলপ্রবণ, drift।<br />
+- secret/password Secrets Manager-এর বদলে environment/কোডে রাখা।<br />
+- খরচ মনিটরিং না করা — Spot/Reserved না ব্যবহার করে অপ্রয়োজনে বিল বৃদ্ধি; runaway auto-scaling-এ MaxSize না রাখা।<br />
+- CloudWatch alarm/monitoring সেট না করা — সমস্যা নীরবে।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- EC2 stateful রেখে auto-scaling (session ElastiCache-এ না রাখা — অধ্যায় ৯)।<br />
+- DynamoDB-তে খারাপ partition key — hot partition (অধ্যায় ১০)।<br />
+- ডাটাবেসকে scaling পরিকল্পনায় না আনা (অ্যাপ scale হয় কিন্তু RDS bottleneck)।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- Serverless-এর cold start ও vendor lock-in বিবেচনা না করা।<br />
+- সবকিছু একটি সেবায় চাপানো — সঠিক কাজে সঠিক সেবা (polyglot) না বাছা।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>Region আর Availability Zone-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>Region একটি বৃহৎ ভৌগোলিক এলাকা (যেমন মুম্বাই); প্রতিটি region-এ একাধিক Availability Zone (AZ) — পৃথক পাওয়ার/কুলিং/নেটওয়ার্কের স্বতন্ত্র datacenter, কিন্তু দ্রুত সংযুক্ত। একাধিক AZ-তে ডিপ্লয় করলে একটি AZ-এর বিপর্যয়েও অ্যাপ চলে (HA)।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>EC2, Lambda আর ECS-এর মধ্যে কখন কোনটি বাছবেন?</em></p>
+<blockquote>
+<p>EC2 — পূর্ণ নিয়ন্ত্রণ, legacy, স্থিতিশীল workload। Lambda — event-driven, sporadic/অপ্রত্যাশিত traffic, কম operational বোঝা (কিন্তু cold start)। ECS/EKS — container-ভিত্তিক microservices, যেখানে orchestration ও portability দরকার।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Public আর Private subnet-এ কী রাখবেন এবং কেন?</em></p>
+<blockquote>
+<p>Public subnet-এ ইন্টারনেট-মুখী রিসোর্স (load balancer, bastion); Private subnet-এ অ্যাপ সার্ভার ও ডাটাবেস (সরাসরি ইন্টারনেট থেকে অপৌঁছানো — নিরাপত্তা)। Private subnet বাইরে যেতে NAT Gateway ব্যবহার করে। ডাটাবেস কখনো public নয়।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>AWS-এ একটি অ্যাপের নিরাপত্তা কীভাবে নিশ্চিত করবেন?</em></p>
+<blockquote>
+<p>Shared Responsibility বুঝে — VPC + private subnet-এ DB/app; কঠোর Security Group; <strong>IAM least privilege + role</strong> (হার্ডকোডেড credential নয়); Secrets Manager-এ secret; KMS দিয়ে এনক্রিপশন (at-rest ও in-transit); CloudFront-এ WAF + Shield; CloudTrail-এ audit; এবং S3 public access block।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি scalable, HA ই-কমার্স অ্যাপ AWS-এ ডিজাইন করুন।</em></p>
+<blockquote>
+<p>Route 53 → CloudFront (CDN+WAF) → ALB (public, multi-AZ) → Auto Scaling Group-এর stateless EC2 (private, ২+ AZ; session ElastiCache-এ) → RDS Multi-AZ (transaction) + DynamoDB (cart) → S3 (media) → SQS+Lambda (async); IAM role, Secrets Manager, VPC নিরাপত্তা; CloudWatch monitoring + auto-scaling; CloudFormation IaC; CodePipeline + blue-green deploy।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices — সরাসরি প্রয়োগযোগ্য)</h2>
+<ul>
+<li><strong>IAM role + least privilege</strong> — কখনো credential হার্ডকোড করবেন না; শুধু প্রয়োজনীয় অনুমতি।</li>
+<li><strong>অন্তত ২ AZ-তে ডিপ্লয়</strong> (HA); DB-তে Multi-AZ; গুরুত্বপূর্ণ হলে Multi-Region।</li>
+<li><strong>DB/app private subnet-এ; LB public-এ; security group কঠোর; S3 public access block।</strong></li>
+<li><strong>secret সবসময় Secrets Manager/Parameter Store-এ</strong> — কোড/env-এ নয়।</li>
+<li><strong>সব অবকাঠামো IaC-তে</strong> (CloudFormation/CDK/Terraform) — reproducible ও version-controlled।</li>
+<li><strong>সঠিক কাজে সঠিক সেবা</strong> — EC2/Lambda/ECS, RDS/DynamoDB; polyglot।</li>
+<li><strong>stateless app + ElastiCache session</strong> — মসৃণ auto-scaling (অধ্যায় ৯)।</li>
+<li><strong>CloudWatch alarm + খরচ মনিটরিং</strong>; Spot/Reserved দিয়ে খরচ অপ্টিমাইজ; auto-scaling-এ MaxSize।</li>
+<li><strong>CI/CD pipeline + blue-green/canary</strong> — নিরাপদ, স্বয়ংক্রিয় ডিপ্লয়।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Cloud মডেল:</strong> IaaS (EC2) → PaaS (Beanstalk/Lambda) → SaaS; যত উপরে তত কম নিয়ন্ত্রণ ও বোঝা।<br />
+- <strong>Global Infra:</strong> Region &gt; AZ &gt; Edge; HA-তে Multi-AZ অপরিহার্য।<br />
+- <strong>Shared Responsibility:</strong> AWS "of the cloud", আপনি "in the cloud"।<br />
+- <strong>IAM:</strong> user/group/role/policy; <strong>least privilege</strong> ও role (credential নয়)।<br />
+- <strong>VPC:</strong> public/private subnet, IGW, NAT, Security Group; DB private-এ।<br />
+- <strong>Core Services:</strong> Compute (EC2/Lambda/ECS), Storage (S3/EBS/EFS), Database (RDS/Aurora/DynamoDB/ElastiCache/Redshift), Networking (Route53/CloudFront/ELB/API GW), Messaging (SQS/SNS/Kinesis/EventBridge), Ops (CloudWatch/CloudTrail), Security (KMS/Secrets Manager/WAF), IaC (CloudFormation/CDK)।<br />
+- <strong>Deployment:</strong> 3-tier (EC2+ASG+ALB+RDS), Serverless (Lambda+API GW+DynamoDB), Container (ECS/EKS); CI/CD (CodePipeline) + blue-green/canary।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> IaaS/PaaS/SaaS, Region, AZ, Edge Location, Multi-AZ, Shared Responsibility, IAM, Role, Policy, Least Privilege, VPC, Public/Private Subnet, Internet Gateway, NAT Gateway, Security Group, EC2, Lambda, ECS/EKS/Fargate, S3/EBS/EFS, RDS/Aurora/DynamoDB/ElastiCache, Route 53, CloudFront, ALB/NLB, API Gateway, SQS/SNS/Kinesis, CloudWatch, KMS, Secrets Manager, WAF, CloudFormation/IaC, CI/CD, Blue-Green, Canary।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. IaaS, PaaS ও SaaS-এর পার্থক্য AWS উদাহরণসহ লিখুন।<br />
+2. কেন ডাটাবেস public subnet-এ রাখা একটি নিরাপত্তা ঝুঁকি?</p>
+<p><strong>Practical:</strong><br />
+3. একটি IAM policy লিখুন যা শুধু একটি নির্দিষ্ট DynamoDB table-এ read অনুমতি দেয় (least privilege)।<br />
+4. EC2-ভিত্তিক বনাম Lambda-ভিত্তিক একটি API-র খরচ ও scaling আচরণের তুলনা করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি ফটো-শেয়ারিং অ্যাপের জন্য সম্পূর্ণ AWS আর্কিটেকচার ডিজাইন করুন (compute, storage, DB, CDN, async, নিরাপত্তা সহ) — প্রতিটি সেবা পছন্দের কারণসহ।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার auto-scaled EC2 অ্যাপে কিছু ব্যবহারকারী মাঝে মাঝে logout হয়ে যাচ্ছেন। AWS-এর প্রেক্ষাপটে কারণ ও সমাধান কী?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে একটি HA, secure, scalable অ্যাপের সম্পূর্ণ AWS ডিপ্লয়মেন্ট বোঝান — প্রতিটি স্তরে কোন সেবা ও কেন।</p>
+<hr />
+<p><strong>অধ্যায় ১৮ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

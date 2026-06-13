@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ৪: RDBMS vs NoSQL, Indexing ও Query Optimization — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html" class="active"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ৪
+      </div>
+      <div class="page-nav">
+        <a href="chapter-3.html">← আগের অধ্যায়</a>
+        <a href="chapter-5.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ৪</div>
+      <h1>অধ্যায় ৪: RDBMS vs NoSQL, Indexing ও Query Optimization</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>প্রতিটি অ্যাপ্লিকেশনের হৃদয় হলো তার <strong>ডাটা</strong>। ব্যবহারকারীর তথ্য, অর্ডার, মেসেজ, ছবি — সবকিছু কোথাও না কোথাও সংরক্ষণ করতে হয়। এই সংরক্ষণের জন্য আমরা <strong>Database (ডাটাবেস)</strong> ব্যবহার করি। কিন্তু কোন ধরনের ডাটাবেস? এই একটি সিদ্ধান্ত আপনার পুরো সিস্টেমের scalability, পারফরম্যান্স ও নির্ভরযোগ্যতা নির্ধারণ করে দিতে পারে।</p>
+<p>এই অধ্যায়ে আমরা দুটি প্রধান ডাটাবেস পরিবার — <strong>RDBMS (সম্পর্কভিত্তিক ডাটাবেস)</strong> ও <strong>NoSQL</strong> — তুলনা করব। এরপর শিখব কীভাবে ডাটাবেসের গতি বাড়ানো যায় <strong>Indexing (ইনডেক্সিং)</strong>-এর মাধ্যমে, এবং কীভাবে ধীর query-কে দ্রুত করা যায় (<strong>Query Optimization</strong>)।</p>
+<p>System Design ইন্টারভিউতে "কোন ডাটাবেস বেছে নেবেন এবং কেন?" — এটি প্রায় নিশ্চিত প্রশ্ন। এই অধ্যায় সেই উত্তরের ভিত্তি গড়বে।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>RDBMS</strong> কী, এর গঠন এবং <strong>ACID</strong> বৈশিষ্ট্য</li>
+<li><strong>NoSQL</strong> কী এবং এর চারটি প্রধান ধরন</li>
+<li>কখন RDBMS, কখন NoSQL বেছে নিতে হয় (ট্রেড-অফসহ)</li>
+<li><strong>Index</strong> কীভাবে query দ্রুত করে এবং এর খরচ</li>
+<li><strong>Query Optimization</strong>-এর মৌলিক কৌশল</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ RDBMS (Relational Database Management System)</h3>
+<p><strong>RDBMS</strong> হলো এমন ডাটাবেস যেখানে ডাটা সারি (row) ও কলাম (column)-বিশিষ্ট <strong>টেবিল (table)</strong>-এ সংরক্ষিত হয় এবং টেবিলগুলোর মধ্যে সম্পর্ক (relationship) থাকে। এর ভাষা <strong>SQL (Structured Query Language)</strong>।</p>
+<p>উদাহরণ: MySQL, PostgreSQL, Oracle, SQL Server।</p>
+<p><strong>মূল বৈশিষ্ট্য:</strong><br />
+- <strong>নির্দিষ্ট Schema (স্কিমা):</strong> আগে থেকে টেবিলের গঠন ঠিক করতে হয়।<br />
+- <strong>সম্পর্ক:</strong> Foreign Key দিয়ে টেবিলগুলো যুক্ত (যেমন <code>orders</code> টেবিল <code>users</code> টেবিলের সাথে যুক্ত)।<br />
+- <strong>ACID গ্যারান্টি</strong> — নির্ভরযোগ্য লেনদেনের ভিত্তি।</p>
+<p><strong>ACID বৈশিষ্ট্য:</strong><br />
+- <strong>Atomicity (পরমাণুত্ব):</strong> একটি লেনদেন হয় পুরো হয়, নয়তো কিছুই হয় না।<br />
+- <strong>Consistency (সামঞ্জস্য):</strong> লেনদেনের আগে ও পরে ডাটা সবসময় বৈধ অবস্থায় থাকে।<br />
+- <strong>Isolation (বিচ্ছিন্নতা):</strong> একসাথে চলা লেনদেনগুলো একে অপরকে প্রভাবিত করে না।<br />
+- <strong>Durability (স্থায়িত্ব):</strong> একবার commit হলে ডাটা স্থায়ী, এমনকি ক্র্যাশেও হারায় না।</p>
+<h3>৩.২ NoSQL (Not Only SQL)</h3>
+<p><strong>NoSQL</strong> হলো এমন ডাটাবেস যা সম্পর্কভিত্তিক টেবিল মডেল অনুসরণ করে না। এগুলো বিশাল পরিমাণ ডাটা ও উচ্চ scalability-র জন্য ডিজাইন করা।</p>
+<p><strong>NoSQL-এর চারটি প্রধান ধরন:</strong></p>
+<ol>
+<li><strong>Document (ডকুমেন্ট):</strong> JSON-সদৃশ ডকুমেন্টে ডাটা রাখে। <em>MongoDB, CouchDB।</em> নমনীয় schema।</li>
+<li><strong>Key-Value (কী-ভ্যালু):</strong> সরল key-value জোড়া। অত্যন্ত দ্রুত। <em>Redis, DynamoDB।</em></li>
+<li><strong>Column-Family (কলাম-ফ্যামিলি):</strong> কলাম-ভিত্তিক, বিশাল ডাটার জন্য। <em>Cassandra, HBase।</em></li>
+<li><strong>Graph (গ্রাফ):</strong> সম্পর্ক (relationship) কেন্দ্রিক — যেমন সোশ্যাল নেটওয়ার্ক। <em>Neo4j।</em></li>
+</ol>
+<p><strong>মূল বৈশিষ্ট্য:</strong><br />
+- <strong>নমনীয় Schema (schema-less):</strong> আগে থেকে গঠন ঠিক করতে হয় না।<br />
+- <strong>Horizontal Scaling সহজ:</strong> ডাটা সহজে একাধিক মেশিনে ভাগ (shard) করা যায়।<br />
+- প্রায়ই <strong>BASE</strong> মডেল অনুসরণ করে (eventual consistency), কঠোর ACID নয়।</p>
+<h3>৩.৩ RDBMS vs NoSQL — তুলনা</h3>
+<table>
+<thead>
+<tr>
+<th>বৈশিষ্ট্য</th>
+<th>RDBMS</th>
+<th>NoSQL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schema</td>
+<td>নির্দিষ্ট, কঠোর</td>
+<td>নমনীয়</td>
+</tr>
+<tr>
+<td>Scaling</td>
+<td>মূলত Vertical</td>
+<td>সহজ Horizontal</td>
+</tr>
+<tr>
+<td>Consistency</td>
+<td>কঠোর (ACID)</td>
+<td>প্রায়ই Eventual (BASE)</td>
+</tr>
+<tr>
+<td>সম্পর্ক/JOIN</td>
+<td>শক্তিশালী</td>
+<td>দুর্বল/নেই</td>
+</tr>
+<tr>
+<td>উপযুক্ত যখন</td>
+<td>জটিল সম্পর্ক, লেনদেন</td>
+<td>বিশাল স্কেল, নমনীয় ডাটা</td>
+</tr>
+<tr>
+<td>উদাহরণ</td>
+<td>ব্যাংকিং, ই-কমার্স অর্ডার</td>
+<td>সোশ্যাল ফিড, লগ, ক্যাশ</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>মূল সূত্র:</strong> ডাটার গঠন স্থির ও সম্পর্ক জটিল হলে এবং লেনদেনের সঠিকতা অপরিহার্য হলে → <strong>RDBMS</strong>। ডাটা বিশাল, নমনীয় এবং প্রচণ্ড scaling দরকার হলে → <strong>NoSQL</strong>। অনেক বড় সিস্টেমে <strong>দুটোই</strong> একসাথে ব্যবহৃত হয় (polyglot persistence)।</p>
+</blockquote>
+<h3>৩.৪ Indexing (ইনডেক্সিং)</h3>
+<p><strong>Index</strong> হলো একটি ডাটা স্ট্রাকচার যা ডাটাবেসে নির্দিষ্ট তথ্য খুঁজে পাওয়ার গতি বাড়ায় — অনেকটা বইয়ের পেছনের সূচিপত্রের মতো।</p>
+<p>Index ছাড়া ডাটাবেসকে পুরো টেবিল স্ক্যান করতে হয় (<strong>Full Table Scan</strong>) — ১ কোটি সারিতে একটি খুঁজতে ১ কোটি সারি দেখা! Index থাকলে কয়েক ধাপেই খুঁজে পাওয়া যায়।</p>
+<p>বেশিরভাগ ডাটাবেস Index-এর জন্য <strong>B-Tree</strong> (ভারসাম্যপূর্ণ গাছ) ব্যবহার করে, যা log(n) সময়ে অনুসন্ধান করতে পারে।</p>
+<p><strong>Index-এর খরচ (Trade-off):</strong><br />
+- <strong>সুবিধা:</strong> read/query অনেক দ্রুত হয়।<br />
+- <strong>অসুবিধা:</strong> write (INSERT/UPDATE/DELETE) ধীর হয় (কারণ Index-ও আপডেট করতে হয়) এবং অতিরিক্ত স্টোরেজ লাগে।</p>
+<blockquote>
+<p>তাই যে কলামে ঘন ঘন অনুসন্ধান হয় (যেমন <code>email</code>, <code>user_id</code>) সেখানেই Index দিন — সব কলামে নয়।</p>
+</blockquote>
+<h3>৩.৫ Query Optimization (পরিচিতি)</h3>
+<p><strong>Query Optimization</strong> হলো একটি query-কে দ্রুততম উপায়ে চালানোর প্রক্রিয়া। মৌলিক কৌশল:</p>
+<ul>
+<li><strong>সঠিক Index ব্যবহার</strong> — WHERE/JOIN-এ ব্যবহৃত কলামে Index।</li>
+<li><strong><code>SELECT *</code> এড়ানো</strong> — শুধু প্রয়োজনীয় কলাম নির্বাচন করুন।</li>
+<li><strong><code>EXPLAIN</code> ব্যবহার</strong> — query কীভাবে চলছে তা বিশ্লেষণ (Full Scan নাকি Index ব্যবহার হচ্ছে?)।</li>
+<li><strong>JOIN কমানো ও সঠিক করা</strong> — অপ্রয়োজনীয় JOIN ব্যয়বহুল।</li>
+<li><strong>Pagination</strong> — একসাথে লক্ষ সারি না এনে <code>LIMIT</code>/<code>OFFSET</code> ব্যবহার।</li>
+</ul>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনার অ্যাপে <code>users</code> টেবিলে ৫ কোটি ব্যবহারকারী। লগইনের সময় আপনি query করেন:</p>
+<pre><code class="language-sql">SELECT * FROM users WHERE email = 'karim@example.com';
+</code></pre>
+<p><code>email</code> কলামে Index না থাকলে ডাটাবেসকে ৫ কোটি সারি একে একে পরীক্ষা করতে হবে — প্রতিটি লগইনে কয়েক সেকেন্ড! হাজারো ব্যবহারকারী একসাথে লগইন করলে ডাটাবেস ধসে পড়বে।</p>
+<p><code>email</code>-এ Index যোগ করলে একই query মিলিসেকেন্ডে সম্পন্ন হয়। এই একটি সিদ্ধান্ত — Index — আপনার সিস্টেমকে ব্যবহারযোগ্য রাখে। এটিই দেখায় কেন ডাটাবেস জ্ঞান সিস্টেম ডিজাইনে অপরিহার্য।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>Index ছাড়া vs Index সহ অনুসন্ধান</h3>
+<pre><code>Index ছাড়া (Full Table Scan):
+Query → [সারি ১][সারি ২][সারি ৩]...[সারি ৫০,০০০,০০০]  → ধীর!
+
+Index সহ (B-Tree):
+Query → [Root] → [Branch] → [Leaf → সঠিক সারি]  → দ্রুত!
+</code></pre>
+<h3>Mermaid: ডাটাবেস নির্বাচনের সিদ্ধান্ত</h3>
+<div class="mermaid">graph TD
+    A[ডাটার প্রয়োজন বিশ্লেষণ] --> B{জটিল সম্পর্ক ও<br/>কঠোর লেনদেন?}
+    B -->|হ্যাঁ| C[RDBMS<br/>PostgreSQL, MySQL]
+    B -->|না| D{বিশাল স্কেল ও<br/>নমনীয় ডাটা?}
+    D -->|হ্যাঁ| E[NoSQL<br/>MongoDB, Cassandra]
+    D -->|সরল key lookup| F[Key-Value<br/>Redis, DynamoDB]</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> সিদ্ধান্ত শুরু হয় ডাটার প্রকৃতি বিশ্লেষণ দিয়ে।<br />
+- <strong>Flow:</strong> জটিল সম্পর্ক ও লেনদেন থাকলে RDBMS; বিশাল নমনীয় ডাটা হলে NoSQL; সরল lookup হলে Key-Value।<br />
+- <strong>বাস্তবতা:</strong> এটি কঠোর নিয়ম নয় — অনেক সিস্টেম একাধিক ডাটাবেস একসাথে ব্যবহার করে (polyglot persistence)।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>SQL: টেবিল, Index ও Optimized Query</h3>
+<pre><code class="language-sql">-- টেবিল তৈরি (RDBMS - নির্দিষ্ট schema)
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    email VARCHAR(255),
+    name VARCHAR(100),
+    created_at TIMESTAMP
+);
+
+-- email কলামে Index (দ্রুত লগইন lookup)
+CREATE INDEX idx_users_email ON users(email);
+
+-- খারাপ: সব কলাম আনা
+SELECT * FROM users WHERE email = 'karim@example.com';
+
+-- ভালো: শুধু প্রয়োজনীয় কলাম, Index ব্যবহৃত হবে
+SELECT id, name FROM users WHERE email = 'karim@example.com';
+
+-- query কীভাবে চলছে তা বিশ্লেষণ
+EXPLAIN SELECT id, name FROM users WHERE email = 'karim@example.com';
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> <code>CREATE INDEX</code> <code>email</code>-এ Index তৈরি করে যা lookup দ্রুত করে। <code>SELECT id, name</code> শুধু দরকারি কলাম আনে (কম ডাটা = দ্রুত)। <code>EXPLAIN</code> দেখায় ডাটাবেস Index ব্যবহার করছে নাকি Full Scan করছে।</p>
+<h3>NoSQL: Document সংরক্ষণ (MongoDB)</h3>
+<pre><code class="language-javascript">// নমনীয় schema — আগে থেকে গঠন ঠিক করতে হয় না
+db.users.insertOne({
+  _id: 1,
+  email: &quot;karim@example.com&quot;,
+  name: &quot;Karim&quot;,
+  hobbies: [&quot;cricket&quot;, &quot;reading&quot;]   // array সহজে রাখা যায়
+});
+
+// email-এ Index তৈরি (NoSQL-এও Index দরকার)
+db.users.createIndex({ email: 1 });
+
+// query
+db.users.find({ email: &quot;karim@example.com&quot; });
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> MongoDB-তে একটি ডকুমেন্টে array (<code>hobbies</code>)-এর মতো জটিল ডাটা সরাসরি রাখা যায় — RDBMS-এ এর জন্য আলাদা টেবিল লাগত। তবে এখানেও দ্রুত query-র জন্য Index অপরিহার্য।<br />
+<strong>সীমাবদ্ধতা:</strong> নমনীয়তার মূল্য হলো — schema নিয়ন্ত্রণ আপনার অ্যাপ্লিকেশন কোডকেই করতে হয়।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Amazon (DynamoDB):</strong> তাদের শপিং কার্টের জন্য নিজস্ব Key-Value NoSQL (DynamoDB) তৈরি করে — উচ্চ availability ও বিশাল scale-এর জন্য, কঠোর consistency-র বদলে।</li>
+<li><strong>Facebook (Cassandra):</strong> Inbox search-এর জন্য Cassandra (Column-Family NoSQL) তৈরি করে বিশাল লেখার পরিমাণ সামলাতে।</li>
+<li><strong>ব্যাংকিং সিস্টেম:</strong> প্রায় সর্বত্র RDBMS (PostgreSQL/Oracle) ব্যবহার করে — কারণ আর্থিক লেনদেনে ACID গ্যারান্টি অপরিহার্য; eventual consistency-তে টাকা হারানো অগ্রহণযোগ্য।</li>
+<li><strong>Netflix:</strong> ভিউয়িং হিস্ট্রি ও বড় ডাটার জন্য Cassandra ব্যবহার করে, যখন কাঠামোগত মেটাডাটার জন্য RDBMS।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- সব কিছুতে <code>SELECT *</code> ব্যবহার করা।<br />
+- "NoSQL সবসময় দ্রুত/ভালো" — এই ভুল ধারণা।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- প্রতিটি কলামে Index দেওয়া — যা write ধীর করে ও স্টোরেজ অপচয় করে।<br />
+- WHERE/JOIN কলামে Index না দেওয়া।</p>
+<p><strong>Production Mistakes:</strong><br />
+- আর্থিক/লেনদেন-নির্ভর সিস্টেমে eventual consistency NoSQL ব্যবহার করা।<br />
+- Pagination ছাড়া লক্ষ লক্ষ সারি একসাথে আনা।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- শুরুতে scaling চাহিদা বিবেচনা না করে ভুল ডাটাবেস নির্বাচন, পরে migration-এ ভোগা।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- জটিল সম্পর্কযুক্ত ডাটায় NoSQL ব্যবহার করে অ্যাপ্লিকেশন কোডে কৃত্রিম JOIN লেখা — যা ত্রুটিপ্রবণ।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>SQL আর NoSQL-এর মূল পার্থক্য কী?</em></p>
+<blockquote>
+<p>SQL/RDBMS নির্দিষ্ট schema ও সম্পর্কভিত্তিক টেবিল ব্যবহার করে ও ACID দেয়; NoSQL নমনীয় schema ও সহজ horizontal scaling দেয়, প্রায়ই eventual consistency-তে।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Index query দ্রুত করলে আমরা কেন সব কলামে Index দিই না?</em></p>
+<blockquote>
+<p>কারণ প্রতিটি Index write (INSERT/UPDATE/DELETE) ধীর করে এবং অতিরিক্ত স্টোরেজ নেয়। তাই শুধু ঘন ঘন অনুসন্ধান হওয়া কলামেই Index দেওয়া হয়।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>ACID-এর "Isolation" বলতে কী বোঝায়?</em></p>
+<blockquote>
+<p>একসাথে চলা একাধিক লেনদেন এমনভাবে চলবে যেন তারা একে অপরের ফলাফল মাঝপথে দেখতে না পায় — ফলে কোনো লেনদেন অন্যটির অসম্পূর্ণ অবস্থা পড়ে ভুল করে না।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি সোশ্যাল মিডিয়া নিউজ ফিডের জন্য কোন ডাটাবেস বেছে নেবেন?</em></p>
+<blockquote>
+<p>নমনীয়তা ও বিশাল read scale-এর জন্য NoSQL (যেমন Cassandra বা document store) উপযুক্ত হতে পারে ফিড স্টোর করতে, যখন ব্যবহারকারীর অ্যাকাউন্ট ও সম্পর্কের জন্য RDBMS বা Graph DB। অর্থাৎ polyglot — একাধিক ডাটাবেসের সমন্বয়।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>ডাটা ও চাহিদা বুঝে ডাটাবেস নির্বাচন করুন</strong> — ট্রেন্ড দেখে নয়।</li>
+<li><strong>WHERE/JOIN/ORDER BY কলামে Index দিন</strong>, কিন্তু অতিরিক্ত Index এড়ান।</li>
+<li><strong><code>SELECT *</code> এড়িয়ে শুধু প্রয়োজনীয় কলাম নিন।</strong></li>
+<li><strong><code>EXPLAIN</code> দিয়ে query বিশ্লেষণ করুন</strong> নিয়মিত।</li>
+<li><strong>আর্থিক/লেনদেনে ACID (RDBMS)</strong> নিশ্চিত করুন।</li>
+<li><strong>Pagination ব্যবহার করুন</strong> বড় ফলাফলে।</li>
+<li>প্রয়োজনে <strong>polyglot persistence</strong> — সঠিক কাজে সঠিক ডাটাবেস।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>RDBMS</strong> = নির্দিষ্ট schema, সম্পর্ক, ACID; জটিল লেনদেনের জন্য আদর্শ।<br />
+- <strong>NoSQL</strong> = নমনীয় schema, সহজ horizontal scaling; চার ধরন (Document, Key-Value, Column-Family, Graph)।<br />
+- <strong>ACID</strong> = Atomicity, Consistency, Isolation, Durability।<br />
+- <strong>Index</strong> = অনুসন্ধান দ্রুত করে (B-Tree), কিন্তু write ধীর করে ও স্টোরেজ নেয়।<br />
+- <strong>Query Optimization</strong> = সঠিক Index, <code>SELECT *</code> এড়ানো, <code>EXPLAIN</code>, pagination।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> RDBMS, SQL, NoSQL, ACID, BASE, Schema, Index, B-Tree, Full Table Scan, Eventual Consistency, Polyglot Persistence, Sharding।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. ACID-এর চারটি বৈশিষ্ট্য নিজের ভাষায় উদাহরণসহ ব্যাখ্যা করুন।<br />
+2. Index কেন read দ্রুত কিন্তু write ধীর করে?</p>
+<p><strong>Practical:</strong><br />
+3. একটি <code>orders</code> টেবিলে <code>customer_id</code> দিয়ে ঘন ঘন query হয়। উপযুক্ত Index তৈরির SQL লিখুন।<br />
+4. <code>SELECT * FROM products WHERE category = 'books'</code> query-টিকে optimize করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি চ্যাট অ্যাপের জন্য ডাটাবেস নির্বাচন করুন — মেসেজ স্টোরেজ ও ব্যবহারকারীর প্রোফাইল আলাদাভাবে বিবেচনা করে যুক্তি দিন।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার রিপোর্ট query ধীরে চলছে। <code>EXPLAIN</code> দেখায় Full Table Scan হচ্ছে। আপনি ধাপে ধাপে কী করবেন?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন একটি ব্যাংকিং অ্যাপ eventual-consistency NoSQL-এর বদলে ACID-সম্পন্ন RDDMS ব্যবহার করবে।</p>
+<hr />
+<p><strong>অধ্যায় ৪ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

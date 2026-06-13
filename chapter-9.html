@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ৯: Horizontal vs Vertical Scaling ও Auto-Scaling Strategies — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html" class="active"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ৯
+      </div>
+      <div class="page-nav">
+        <a href="chapter-8.html">← আগের অধ্যায়</a>
+        <a href="chapter-10.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ৯</div>
+      <h1>অধ্যায় ৯: Horizontal vs Vertical Scaling ও Auto-Scaling Strategies</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>অধ্যায় ২-এ আমরা scalability-র মৌলিক ধারণা ছুঁয়ে দেখেছি। এখন সময় এসেছে গভীরে যাওয়ার — কারণ scaling হলো সিস্টেম ডিজাইনের সবচেয়ে কেন্দ্রীয় প্রশ্ন: "আমার ব্যবহারকারী ১০ গুণ বেড়ে গেলে সিস্টেম কীভাবে টিকে থাকবে?"</p>
+<p>দুটি মৌলিক পথ আছে — হয় আপনার মেশিনকে <strong>আরও শক্তিশালী</strong> করুন (Vertical Scaling), নয়তো <strong>আরও মেশিন যোগ</strong> করুন (Horizontal Scaling)। প্রতিটির নিজস্ব শক্তি, সীমা ও খরচ আছে। ভুল পথ বেছে নিলে হয় টাকা অপচয় হবে, নয়তো সিস্টেম একটি সীমায় গিয়ে আর বাড়তে পারবে না।</p>
+<p>এর সাথে আসে আরও বুদ্ধিমান প্রশ্ন — চাহিদা তো সবসময় এক থাকে না। দিনে বেশি, রাতে কম; Black Friday-তে আকাশছোঁয়া। তাহলে আমরা কি সবসময় সর্বোচ্চ ক্ষমতার জন্য টাকা দেব? না — এখানেই আসে <strong>Auto-Scaling</strong>: চাহিদা অনুযায়ী স্বয়ংক্রিয়ভাবে রিসোর্স বাড়ানো-কমানো। এই অধ্যায়ে আমরা এই দুটি বিষয়ই বিস্তারিত শিখব।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>Vertical Scaling (Scale Up)</strong> কী, এর সুবিধা ও কঠিন সীমা</li>
+<li><strong>Horizontal Scaling (Scale Out)</strong> কী, এর শক্তি ও জটিলতা</li>
+<li>কেন horizontal scaling-এর জন্য <strong>Stateless</strong> ডিজাইন অপরিহার্য</li>
+<li><strong>Stateful</strong> সিস্টেম কীভাবে scale করা হয় (sticky session, shared state)</li>
+<li><strong>Auto-Scaling</strong> কী এবং এর ধরন (Reactive, Scheduled, Predictive)</li>
+<li>Scaling-এর গুরুত্বপূর্ণ ধারণা: cooldown, warm-up, scaling policy, metrics</li>
+<li>কখন কোন scaling কৌশল বেছে নিতে হয়</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ Vertical Scaling (উল্লম্ব স্কেলিং / Scale Up)</h3>
+<p><strong>Vertical Scaling</strong> মানে একই মেশিনে আরও বেশি রিসোর্স যোগ করা — বেশি CPU, বেশি RAM, দ্রুততর ডিস্ক। অর্থাৎ একটি ছোট সার্ভারকে একটি শক্তিশালী সার্ভারে রূপান্তর করা।</p>
+<p>উপমা: একটি ছোট গাড়িকে আরও শক্তিশালী ইঞ্জিনের গাড়িতে বদলানো।</p>
+<p><strong>সুবিধা:</strong><br />
+- <strong>সরলতা:</strong> অ্যাপ্লিকেশন কোড বদলাতে হয় না; শুধু বড় মেশিন।<br />
+- <strong>কোনো distributed জটিলতা নেই:</strong> একটিই মেশিন, তাই data consistency, network সমস্যা নেই।<br />
+- <strong>legacy অ্যাপের জন্য উপযুক্ত</strong> যা একাধিক মেশিনে চলার জন্য ডিজাইন নয়।</p>
+<p><strong>অসুবিধা / সীমা:</strong><br />
+- <strong>কঠিন উপরের সীমা (hard ceiling):</strong> একটি মেশিন একটি নির্দিষ্ট আকারের বেশি বড় হতে পারে না।<br />
+- <strong>Single Point of Failure:</strong> ঐ একটিই মেশিন ডাউন হলে পুরো সিস্টেম ডাউন।<br />
+- <strong>খরচ অরৈখিক:</strong> দ্বিগুণ শক্তিশালী মেশিন প্রায়ই দ্বিগুণের চেয়ে অনেক বেশি দামি।<br />
+- <strong>Downtime:</strong> প্রায়ই আপগ্রেডের সময় মেশিন বন্ধ করতে হয়।</p>
+<h3>৩.২ Horizontal Scaling (অনুভূমিক স্কেলিং / Scale Out)</h3>
+<p><strong>Horizontal Scaling</strong> মানে আরও বেশি মেশিন (সার্ভার/node) যোগ করা এবং তাদের মধ্যে লোড ভাগ করে দেওয়া (সাধারণত একটি Load Balancer দিয়ে)।</p>
+<p>উপমা: একটি শক্তিশালী গাড়ির বদলে অনেকগুলো গাড়ি ব্যবহার করা।</p>
+<p><strong>সুবিধা:</strong><br />
+- <strong>প্রায় অসীম scaling:</strong> যত খুশি মেশিন যোগ করা যায় (internet-scale সম্ভব)।<br />
+- <strong>High Availability:</strong> একটি মেশিন ডাউন হলেও বাকিরা কাজ চালিয়ে নেয় (no single point of failure)।<br />
+- <strong>খরচ-কার্যকর:</strong> সস্তা সাধারণ মেশিন (commodity hardware) ব্যবহার করা যায়।<br />
+- <strong>Elastic:</strong> চাহিদা অনুযায়ী মেশিন যোগ/সরানো সহজ (auto-scaling)।</p>
+<p><strong>অসুবিধা / জটিলতা:</strong><br />
+- <strong>Distributed জটিলতা:</strong> data consistency, network latency, coordination সমস্যা।<br />
+- <strong>Load Balancer দরকার</strong> এবং অ্যাপকে <strong>stateless</strong> হতে হয় (নিচে দেখুন)।<br />
+- <strong>ডাটাবেস scaling কঠিন</strong> (sharding, replication লাগে — অধ্যায় ১০)।</p>
+<h3>৩.৩ তুলনা: Vertical vs Horizontal</h3>
+<table>
+<thead>
+<tr>
+<th>বৈশিষ্ট্য</th>
+<th>Vertical (Scale Up)</th>
+<th>Horizontal (Scale Out)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>পদ্ধতি</td>
+<td>একই মেশিন বড় করা</td>
+<td>আরও মেশিন যোগ</td>
+</tr>
+<tr>
+<td>সীমা</td>
+<td>কঠিন উপরের সীমা</td>
+<td>প্রায় অসীম</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>Single Point of Failure</td>
+<td>উচ্চ (redundant)</td>
+</tr>
+<tr>
+<td>জটিলতা</td>
+<td>সরল</td>
+<td>জটিল (distributed)</td>
+</tr>
+<tr>
+<td>খরচ</td>
+<td>অরৈখিক, বেশি</td>
+<td>রৈখিক, commodity hardware</td>
+</tr>
+<tr>
+<td>কোড পরিবর্তন</td>
+<td>কম</td>
+<td>stateless হতে হয়</td>
+</tr>
+<tr>
+<td>উদাহরণ</td>
+<td>ছোট DB, legacy অ্যাপ</td>
+<td>web server, microservices</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>মূল সূত্র:</strong> শুরুতে vertical scaling সরল ও যথেষ্ট; কিন্তু internet-scale ও high availability-র জন্য horizontal scaling অপরিহার্য। বাস্তবে প্রায়ই <strong>দুটোই</strong> ব্যবহৃত হয় — প্রতিটি মেশিন যথেষ্ট শক্তিশালী (vertical), এবং একাধিক মেশিন (horizontal)।</p>
+</blockquote>
+<h3>৩.৪ Stateless vs Stateful — Horizontal Scaling-এর চাবিকাঠি</h3>
+<p>Horizontal scaling সফল হওয়ার মূল শর্ত হলো <strong>statelessness</strong>।</p>
+<ul>
+<li><strong>Stateless সার্ভার:</strong> কোনো অনুরোধের তথ্য (session/state) নিজের মেমরিতে রাখে না; প্রতিটি অনুরোধ স্বাধীন। ফলে যেকোনো সার্ভার যেকোনো অনুরোধ সামলাতে পারে — Load Balancer অবাধে যেকোনো মেশিনে পাঠাতে পারে।</li>
+<li><strong>Stateful সার্ভার:</strong> ব্যবহারকারীর state (যেমন login session) নিজের মেমরিতে রাখে। সমস্যা — ঐ ব্যবহারকারীর পরের অনুরোধ অন্য সার্ভারে গেলে state হারিয়ে যায় (যেমন হঠাৎ logout)।</li>
+</ul>
+<p><strong>Stateful সিস্টেম scale করার উপায়:</strong><br />
+1. <strong>Sticky Session (Session Affinity):</strong> Load Balancer একই ব্যবহারকারীকে সবসময় একই সার্ভারে পাঠায়। <em>সরল, কিন্তু লোড অসম হতে পারে এবং সার্ভার ডাউন হলে state হারায়।</em><br />
+2. <strong>External/Shared State:</strong> session/state কে সার্ভারের বাইরে শেয়ারড স্টোরে রাখা — যেমন <strong>Redis</strong> বা ডাটাবেস। তখন সব সার্ভার stateless থাকে, state কেন্দ্রীয়ভাবে শেয়ারড। <em>এটিই প্রস্তাবিত আধুনিক পদ্ধতি।</em></p>
+<blockquote>
+<p>তাই নিয়ম: <strong>অ্যাপ সার্ভারকে stateless রাখুন, state বাইরে (Redis/DB) রাখুন</strong> — তাহলে horizontal scaling মসৃণ হয়।</p>
+</blockquote>
+<h3>৩.৫ Auto-Scaling কী?</h3>
+<p><strong>Auto-Scaling</strong> হলো চাহিদা (load) অনুযায়ী স্বয়ংক্রিয়ভাবে সার্ভার সংখ্যা (বা আকার) বাড়ানো-কমানোর প্রক্রিয়া — মানুষের হস্তক্ষেপ ছাড়া।</p>
+<p>লক্ষ্য: <strong>চাহিদা বেশি হলে যথেষ্ট ক্ষমতা; চাহিদা কম হলে কম খরচ।</strong> অর্থাৎ পারফরম্যান্স ও খরচের মধ্যে স্বয়ংক্রিয় ভারসাম্য।</p>
+<p>দুই দিকে scaling:<br />
+- <strong>Scale Out / Up:</strong> চাহিদা বাড়লে সার্ভার যোগ।<br />
+- <strong>Scale In / Down:</strong> চাহিদা কমলে সার্ভার সরানো (খরচ বাঁচাতে)।</p>
+<h3>৩.৬ Auto-Scaling-এর ধরন</h3>
+<ol>
+<li><strong>Reactive (Dynamic) Scaling:</strong> বর্তমান metrics (CPU, memory, request count, queue depth) দেখে তৎক্ষণাৎ প্রতিক্রিয়া। যেমন "CPU ৭০%-এর বেশি হলে ২টি সার্ভার যোগ করো।" <em>সবচেয়ে প্রচলিত।</em></li>
+<li><strong>Scheduled Scaling:</strong> পূর্বানুমেয় প্যাটার্নে সময় অনুযায়ী। যেমন "প্রতিদিন সকাল ৯টায় বাড়াও, রাত ১১টায় কমাও।" <em>পরিচিত ট্র্যাফিক চক্রে আদর্শ।</em></li>
+<li><strong>Predictive Scaling:</strong> মেশিন লার্নিং দিয়ে ভবিষ্যৎ চাহিদা পূর্বাভাস দিয়ে <strong>আগেই</strong> scale করা। <em>spike আসার আগেই প্রস্তুত;</em> AWS-এর মতো ক্লাউডে উপলব্ধ।</li>
+</ol>
+<h3>৩.৭ Auto-Scaling-এর গুরুত্বপূর্ণ ধারণা</h3>
+<ul>
+<li><strong>Metrics / Triggers:</strong> কোন সূচকের ভিত্তিতে scale হবে — CPU utilization, memory, request/sec, latency, queue length।</li>
+<li><strong>Scaling Policy:</strong> নিয়ম — কখন কতটা বাড়াবে/কমাবে (যেমন "একবারে ২টি যোগ", বা target tracking — "CPU ৫০%-এ রাখো")।</li>
+<li><strong>Min / Max / Desired:</strong> ন্যূনতম, সর্বোচ্চ ও কাঙ্ক্ষিত সার্ভার সংখ্যা — যাতে অসীমভাবে না বাড়ে বা শূন্যে না নামে।</li>
+<li><strong>Cooldown Period:</strong> একটি scaling কাজের পর কিছুক্ষণ অপেক্ষা — যাতে দ্রুত উপর্যুপরি (oscillation/thrashing) scaling না হয়।</li>
+<li><strong>Warm-up Time:</strong> নতুন সার্ভার চালু হয়ে ট্র্যাফিক নেওয়ার জন্য প্রস্তুত হতে যে সময় লাগে — এটি বিবেচনা না করলে অপ্রস্তুত সার্ভারে ট্র্যাফিক গিয়ে ব্যর্থ হয়।</li>
+<li><strong>Health Check:</strong> auto-scaling অসুস্থ সার্ভার সরিয়ে নতুন প্রতিস্থাপন করতে পারে (self-healing)।</li>
+</ul>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনার একটি ই-কমার্স সাইট। সাধারণ দিনে ৫টি সার্ভারই যথেষ্ট। কিন্তু ঈদের সেল বা Black Friday-তে ট্র্যাফিক ২০ গুণ বেড়ে যায়।</p>
+<p><strong>Vertical Scaling দিয়ে:</strong> আপনি একটি বিশাল সার্ভার কিনলেন যা peak সামলাতে পারে। সমস্যা — (১) বছরের ৩৬০ দিন এই বিশাল ক্ষমতা অলস বসে থাকে, কিন্তু আপনি পুরো দাম দিচ্ছেন; (২) এর চেয়ে বড় কিছু লাগলে আর উপায় নেই (ceiling); (৩) এটি ডাউন হলে পুরো সাইট শেষ।</p>
+<p><strong>Horizontal + Auto-Scaling দিয়ে:</strong><br />
+- সাধারণ দিনে ৫টি সার্ভার চলে (কম খরচ)।<br />
+- ট্র্যাফিক বাড়লে CPU ৭০% ছাড়ালে auto-scaling স্বয়ংক্রিয়ভাবে সার্ভার যোগ করে — peak-এ হয়তো ১০০টি।<br />
+- সেল শেষে চাহিদা কমলে আবার ৫টিতে নেমে আসে — শুধু যা ব্যবহার করেছেন তারই দাম।<br />
+- একটি সার্ভার ডাউন হলে health check সেটি সরিয়ে নতুন দেয় (self-healing)।</p>
+<p>এটিই ক্লাউডের মূল প্রতিশ্রুতি — <strong>elasticity</strong>। Amazon নিজেই এই সমস্যা সমাধানে AWS তৈরি করেছিল।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>Vertical vs Horizontal</h3>
+<pre><code>VERTICAL (Scale Up):              HORIZONTAL (Scale Out):
+
+   +----------+                      +-------+ +-------+ +-------+
+   |  Small   |                      |Server1| |Server2| |Server3|
+   +----------+                      +-------+ +-------+ +-------+
+        |                                 \       |       /
+        v  (বড় করা)                        \      |      /
+   +----------+                          +-----------------+
+   |  BIG     |                          |  Load Balancer  |
+   |  Server  |                          +-----------------+
+   +----------+                          (আরও যোগ করা যায়)
+   (একটি, সীমিত)                        (অনেক, প্রায় অসীম)
+</code></pre>
+<h3>Mermaid: Auto-Scaling চক্র</h3>
+<div class="mermaid">graph TD
+    M[Metrics মনিটর<br/>CPU, request/sec] --> D{সীমা অতিক্রম?}
+    D -->|CPU > 70%| U[Scale Out<br/>সার্ভার যোগ]
+    D -->|CPU < 30%| I[Scale In<br/>সার্ভার সরানো]
+    D -->|স্বাভাবিক| W[অপেক্ষা]
+    U --> CD[Cooldown]
+    I --> CD
+    CD --> M</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> একটি মনিটরিং সিস্টেম metrics দেখে; scaling policy সিদ্ধান্ত নেয়; cooldown thrashing রোধ করে।<br />
+- <strong>Flow:</strong> metrics → সীমা পরীক্ষা → প্রয়োজনে scale out/in → cooldown → আবার মনিটর (ক্রমাগত লুপ)।<br />
+- <strong>Failure Points:</strong> warm-up সময় বিবেচনা না করলে নতুন সার্ভার প্রস্তুত হওয়ার আগেই ট্র্যাফিক পায়; cooldown না থাকলে দ্রুত oscillation।<br />
+- <strong>Scaling:</strong> min/max সীমা নিশ্চিত করে নিয়ন্ত্রিত elasticity — না অসীম বাড়ে, না শূন্যে নামে।</p>
+<h3>Stateless ডিজাইন (Shared State)</h3>
+<div class="mermaid">graph TD
+    LB[Load Balancer] --> S1[App Server 1 - stateless]
+    LB --> S2[App Server 2 - stateless]
+    LB --> S3[App Server 3 - stateless]
+    S1 --> R[(Redis - shared session)]
+    S2 --> R
+    S3 --> R</div>
+<p><strong>ব্যাখ্যা:</strong> সব অ্যাপ সার্ভার stateless; session/state কেন্দ্রীয় Redis-এ। ফলে Load Balancer যেকোনো সার্ভারে অনুরোধ পাঠাতে পারে — horizontal scaling মসৃণ হয়, এবং একটি সার্ভার ডাউন হলেও state হারায় না।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>Stateless সার্ভার: session Redis-এ রাখা (Node.js)</h3>
+<pre><code class="language-javascript">const session = require('express-session');
+const RedisStore = require('connect-redis').default;
+const redisClient = require('redis').createClient();
+
+app.use(session({
+  store: new RedisStore({ client: redisClient }),  // state সার্ভারে নয়, Redis-এ
+  secret: 'my-secret',
+  resave: false,
+  saveUninitialized: false
+}));
+
+// এখন যেকোনো সার্ভার এই session পড়তে পারে → stateless app, scalable
+app.get('/profile', (req, res) =&gt; {
+  res.json({ user: req.session.user });   // session আসে শেয়ারড Redis থেকে
+});
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> সাধারণভাবে session সার্ভারের মেমরিতে থাকে (stateful) — যা horizontal scaling ভাঙে। এখানে <code>RedisStore</code> দিয়ে session <strong>Redis-এ</strong> রাখা হচ্ছে। ফলে সব অ্যাপ সার্ভার একই session ভাগ করে; Load Balancer অবাধে যেকোনো সার্ভারে অনুরোধ পাঠাতে পারে — sticky session ছাড়াই।</p>
+<h3>AWS Auto-Scaling Policy (ধারণাগত কনফিগ)</h3>
+<pre><code class="language-yaml">AutoScalingGroup:
+  MinSize: 2            # সর্বনিম্ন ২টি সার্ভার সবসময়
+  MaxSize: 50           # সর্বোচ্চ ৫০টি পর্যন্ত
+  DesiredCapacity: 5    # স্বাভাবিক অবস্থায় ৫টি
+
+ScalingPolicy:          # Target Tracking
+  TargetMetric: CPUUtilization
+  TargetValue: 50       # CPU গড়ে ৫০%-এ ধরে রাখো
+  ScaleOutCooldown: 300 # scale out-এর পর ৩০০ সে. অপেক্ষা
+  ScaleInCooldown: 300
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> এটি একটি <strong>target tracking</strong> policy — সিস্টেম স্বয়ংক্রিয়ভাবে সার্ভার যোগ/সরিয়ে CPU-কে ৫০%-এর কাছাকাছি রাখার চেষ্টা করে। <code>MinSize</code> নিশ্চিত করে redundancy (কখনো ১টির নিচে নয়); <code>MaxSize</code> খরচ সীমিত রাখে; <code>Cooldown</code> দ্রুত oscillation রোধ করে।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Amazon / AWS:</strong> Amazon তাদের নিজস্ব peak (holiday sale) সমস্যা সমাধানে elastic infrastructure তৈরি করে, যা পরে AWS Auto Scaling হিসেবে বাজারে আসে — আধুনিক auto-scaling-এর ভিত্তি।</li>
+<li><strong>Netflix:</strong> AWS-এ সম্পূর্ণ horizontally scaled; দৈনিক ট্র্যাফিক প্যাটার্ন (সন্ধ্যায় peak) অনুযায়ী auto-scale করে; stateless সার্ভিস ডিজাইনে অগ্রদূত।</li>
+<li><strong>Pokémon GO (লঞ্চ):</strong> প্রত্যাশার বহুগুণ ট্র্যাফিকে প্রাথমিক স্ট্রাগলের পর Google Cloud-এ আক্রমণাত্মক horizontal scaling — auto-scaling-এর বিখ্যাত বাস্তব পরীক্ষা।</li>
+<li><strong>Uber/Airbnb:</strong> stateless microservices + auto-scaling দিয়ে দৈনিক ও মৌসুমি চাহিদার ওঠানামা সামলায়।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- শুধু vertical scaling-এর ওপর নির্ভর করা — দ্রুত ceiling-এ পৌঁছায়।<br />
+- অ্যাপকে stateful রেখে horizontal scale করার চেষ্টা — ব্যবহারকারী এলোমেলোভাবে logout হয়।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- session সার্ভার মেমরিতে রাখা (Redis/DB-তে নয়) — scaling ভেঙে যায়।<br />
+- sticky session-এর ওপর অতিনির্ভরতা — লোড অসম ও সার্ভার ডাউনে state হারায়।</p>
+<p><strong>Production Mistakes:</strong><br />
+- <strong>Cooldown না রাখা</strong> — সার্ভার দ্রুত যোগ-সরানোর oscillation (thrashing), অস্থিতিশীলতা ও খরচ।<br />
+- <strong>Warm-up উপেক্ষা</strong> — অপ্রস্তুত নতুন সার্ভারে ট্র্যাফিক গিয়ে ব্যর্থ।<br />
+- <strong>MaxSize না রাখা</strong> — runaway scaling (বা আক্রমণে) বিশাল বিল।<br />
+- ডাটাবেসকে auto-scaling-এর বাইরে রাখা — অ্যাপ scale হয় কিন্তু DB bottleneck হয়ে যায়।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- ভুল metric-এ scale করা (যেমন শুধু CPU দেখা, যখন আসল bottleneck memory বা queue depth)।<br />
+- ডাটাবেসকে scaling পরিকল্পনায় না আনা — অ্যাপ স্তর scale হলেও DB একক bottleneck থেকে যায়।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- scale-in-এর সময় চলমান কাজ (in-flight request) ছাড়াই সার্ভার হঠাৎ বন্ধ করা — graceful shutdown না থাকা।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>Vertical আর Horizontal scaling-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>Vertical = একই মেশিন বড় করা (বেশি CPU/RAM), সরল কিন্তু সীমিত ও single point of failure। Horizontal = আরও মেশিন যোগ করা, প্রায় অসীম ও high availability, কিন্তু distributed জটিলতা ও stateless ডিজাইন দরকার।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Horizontal scaling-এর জন্য stateless ডিজাইন কেন জরুরি?</em></p>
+<blockquote>
+<p>কারণ Load Balancer যেকোনো অনুরোধ যেকোনো সার্ভারে পাঠায়। সার্ভার যদি state (session) নিজের মেমরিতে রাখে, পরের অনুরোধ অন্য সার্ভারে গেলে state হারায়। তাই state বাইরে (Redis/DB) রেখে সার্ভার stateless রাখা হয়।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Sticky session কী এবং এর সমস্যা কী?</em></p>
+<blockquote>
+<p>Load Balancer একই ব্যবহারকারীকে সবসময় একই সার্ভারে পাঠায়। সমস্যা — লোড অসম হতে পারে এবং ঐ সার্ভার ডাউন হলে ব্যবহারকারীর state হারায়। তাই shared external state বেশি নির্ভরযোগ্য।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>Auto-scaling-এ cooldown ও warm-up কেন গুরুত্বপূর্ণ?</em></p>
+<blockquote>
+<p>Cooldown একটি scaling কাজের পর অপেক্ষা করায়, যাতে metrics স্থিতিশীল হওয়ার আগেই বারবার scale করে oscillation (thrashing) না হয়। Warm-up হলো নতুন সার্ভার প্রস্তুত হতে লাগা সময়; এটি বিবেচনা না করলে অপ্রস্তুত সার্ভারে ট্র্যাফিক গিয়ে ব্যর্থ হয়।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি সিস্টেম ডিজাইন করুন যা স্বাভাবিক দিনে কম ও ফ্ল্যাশ সেলে ১০০ গুণ ট্র্যাফিক সামলায়।</em></p>
+<blockquote>
+<p>Stateless অ্যাপ সার্ভার (state Redis-এ) + Load Balancer + Auto-Scaling Group (min/max/desired সহ)। পরিচিত সেলের জন্য <strong>Scheduled/Predictive scaling</strong> দিয়ে আগেই warm-up; আকস্মিক spike-এর জন্য <strong>Reactive scaling</strong> (CPU/request metric)। ডাটাবেসে read replica/caching দিয়ে DB bottleneck রোধ; queue দিয়ে ভারী কাজ async (অধ্যায় ৮)। MaxSize দিয়ে খরচ সীমা।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>অ্যাপ সার্ভার stateless রাখুন; state Redis/DB-তে</strong> — মসৃণ horizontal scaling-এর জন্য।</li>
+<li><strong>শুরুতে vertical, বৃদ্ধিতে horizontal</strong> — এবং উভয়ের সমন্বয়।</li>
+<li><strong>Auto-scaling-এ সঠিক metric বাছুন</strong> (শুধু CPU নয় — request/sec, queue depth, latency)।</li>
+<li><strong>Min/Max সীমা সেট করুন</strong> — redundancy ও খরচ নিয়ন্ত্রণ উভয়ের জন্য।</li>
+<li><strong>Cooldown ও warm-up কনফিগার করুন</strong> — oscillation ও অপ্রস্তুত-সার্ভার সমস্যা রোধে।</li>
+<li><strong>Health check + self-healing</strong> রাখুন — অসুস্থ সার্ভার স্বয়ংক্রিয় প্রতিস্থাপন।</li>
+<li><strong>Graceful shutdown</strong> নিশ্চিত করুন scale-in-এ — চলমান অনুরোধ শেষ করে তবেই বন্ধ।</li>
+<li><strong>ডাটাবেসকেও scaling পরিকল্পনায় আনুন</strong> — নইলে এটিই bottleneck।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Vertical Scaling</strong> = একই মেশিন বড় করা; সরল কিন্তু সীমিত ও single point of failure।<br />
+- <strong>Horizontal Scaling</strong> = আরও মেশিন যোগ; প্রায় অসীম ও high availability, কিন্তু distributed জটিলতা।<br />
+- <strong>Statelessness</strong> = horizontal scaling-এর চাবিকাঠি; state বাইরে (Redis/DB) রাখা।<br />
+- <strong>Stateful scaling:</strong> sticky session (সরল, ভঙ্গুর) বা shared external state (প্রস্তাবিত)।<br />
+- <strong>Auto-Scaling</strong> = চাহিদা অনুযায়ী স্বয়ংক্রিয় scale out/in; খরচ ও পারফরম্যান্সের ভারসাম্য।<br />
+- <strong>ধরন:</strong> Reactive (metric-ভিত্তিক), Scheduled (সময়-ভিত্তিক), Predictive (ML-ভিত্তিক)।<br />
+- <strong>ধারণা:</strong> metrics/trigger, scaling policy, min/max/desired, cooldown, warm-up, health check।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> Scale Up, Scale Out, Single Point of Failure, Commodity Hardware, Stateless, Stateful, Sticky Session, Shared State, Auto-Scaling, Reactive/Scheduled/Predictive, Scaling Policy, Target Tracking, Cooldown, Warm-up, Min/Max/Desired, Elasticity, Self-healing, Graceful Shutdown।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. Vertical ও Horizontal scaling-এর তিনটি করে সুবিধা/অসুবিধা লিখুন।<br />
+2. কেন cooldown period ছাড়া auto-scaling অস্থিতিশীল হতে পারে?</p>
+<p><strong>Practical:</strong><br />
+3. একটি stateful login সিস্টেমকে stateless বানানোর ধাপগুলো লিখুন।<br />
+4. একটি auto-scaling policy ডিজাইন করুন যা request/sec metric-এর ভিত্তিতে scale করে (target ও cooldown সহ)।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি ভিডিও স্ট্রিমিং সাইটের জন্য scaling আর্কিটেকচার ডিজাইন করুন — app server, state, ও database স্তর আলাদাভাবে বিবেচনা করে।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার auto-scaling প্রতি কয়েক মিনিটে সার্ভার যোগ ও সরাচ্ছে (oscillation)। সম্ভাব্য কারণ ও সমাধান কী?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন শুধু vertical scaling দিয়ে একটি internet-scale অ্যাপ (যেমন Twitter) চালানো সম্ভব নয়।</p>
+<hr />
+<p><strong>অধ্যায় ৯ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

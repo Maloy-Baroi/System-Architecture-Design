@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ৫: Caching, Redis, Memcached ও Cache Invalidation Strategies — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html" class="active"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ৫
+      </div>
+      <div class="page-nav">
+        <a href="chapter-4.html">← আগের অধ্যায়</a>
+        <a href="chapter-6.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ৫</div>
+      <h1>অধ্যায় ৫: Caching, Redis, Memcached ও Cache Invalidation Strategies</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>আগের অধ্যায়ে আমরা দেখেছি Index কীভাবে ডাটাবেস query দ্রুত করে। কিন্তু এমনকি দ্রুততম ডাটাবেসও যদি লক্ষ লক্ষ একই অনুরোধ বারবার পায়, তবে চাপে পড়ে যায়। কল্পনা করুন — একটি জনপ্রিয় পোস্ট ১ কোটি মানুষ দেখছে। প্রতিবার একই ডাটা ডাটাবেস থেকে আনা মানে অপচয় ও ধীরগতি।</p>
+<p>এর সমাধান হলো <strong>Caching (ক্যাশিং)</strong> — একবার আনা ডাটা দ্রুত-অ্যাক্সেসযোগ্য জায়গায় সাময়িকভাবে রেখে দেওয়া, যাতে পরের বার সরাসরি সেখান থেকেই দেওয়া যায়। Caching হলো সিস্টেম ডিজাইনের সবচেয়ে শক্তিশালী ও সবচেয়ে বেশি ব্যবহৃত পারফরম্যান্স কৌশল।</p>
+<p>এই অধ্যায়ে আমরা শিখব Caching কী, কীভাবে কাজ করে, দুটি জনপ্রিয় টুল <strong>Redis</strong> ও <strong>Memcached</strong>, এবং সবচেয়ে কঠিন সমস্যা — <strong>Cache Invalidation</strong> (পুরোনো ক্যাশ কখন ও কীভাবে মুছবেন)।</p>
+<blockquote>
+<p>কম্পিউটার সায়েন্সে একটি বিখ্যাত উক্তি আছে: "There are only two hard things in Computer Science: cache invalidation and naming things." — অর্থাৎ ক্যাশ invalidation সত্যিই কঠিন।</p>
+</blockquote>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>Cache</strong> কী, কেন দরকার, এবং কোথায় বসে (cache topologies)</li>
+<li><strong>Cache Hit</strong> ও <strong>Cache Miss</strong>-এর ধারণা</li>
+<li>৬টি Caching প্যাটার্ন (Cache-Aside, Read-Through, Write-Through, Write-Around, Write-Behind, Refresh-Ahead)</li>
+<li><strong>Redis</strong> ও <strong>Memcached</strong>-এর পার্থক্য</li>
+<li><strong>Cache Invalidation</strong> কৌশল ও <strong>TTL</strong> ও <strong>Eviction Policy</strong></li>
+<li>ক্যাশের প্রধান সমস্যা (Penetration, Avalanche, Stampede, Hot Key) ও সমাধান</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ Cache কী?</h3>
+<p><strong>Cache (ক্যাশ)</strong> হলো একটি দ্রুত, সাময়িক স্টোরেজ স্তর যেখানে ঘন ঘন প্রয়োজনীয় ডাটার অনুলিপি রাখা হয়, যাতে ধীর মূল উৎস (যেমন ডাটাবেস বা দূরের API) বারবার ব্যবহার না করতে হয়।</p>
+<p>ক্যাশ সাধারণত <strong>RAM (মেমরি)</strong>-তে থাকে, যা ডিস্ক-ভিত্তিক ডাটাবেসের চেয়ে শত-হাজার গুণ দ্রুত।</p>
+<p><strong>Cache Hit ও Cache Miss:</strong><br />
+- <strong>Cache Hit:</strong> প্রয়োজনীয় ডাটা ক্যাশে পাওয়া গেছে → দ্রুত উত্তর।<br />
+- <strong>Cache Miss:</strong> ডাটা ক্যাশে নেই → মূল উৎস থেকে আনতে হয় (ধীর), তারপর ক্যাশে রাখা হয়।</p>
+<p><strong>Cache Hit Ratio</strong> = (Cache Hits) / (মোট অনুরোধ)। যত বেশি, তত ভালো — ভালো সিস্টেমে এটি ৯০%+ হয়।</p>
+<h3>৩.২ ক্যাশ কোথায় বসে?</h3>
+<p>ক্যাশ সিস্টেমের বিভিন্ন স্তরে থাকতে পারে:</p>
+<ul>
+<li><strong>Client-side Cache:</strong> ব্রাউজার ক্যাশ, মোবাইল অ্যাপের লোকাল ক্যাশ।</li>
+<li><strong>CDN Cache:</strong> ব্যবহারকারীর ভৌগোলিকভাবে কাছাকাছি স্ট্যাটিক কনটেন্ট (অধ্যায় ৬)।</li>
+<li><strong>Application / In-Process Cache (Local):</strong> অ্যাপ সার্ভারের নিজস্ব মেমরিতে (যেমন Java-তে Caffeine, Guava)। সবচেয়ে দ্রুত (নেটওয়ার্ক নেই), কিন্তু প্রতিটি সার্ভারে আলাদা — তাই একাধিক সার্ভারে inconsistency।</li>
+<li><strong>Distributed Cache (Remote):</strong> আলাদা ক্যাশ ক্লাস্টার (Redis/Memcached) যা সব অ্যাপ সার্ভার শেয়ার করে। সামান্য নেটওয়ার্ক latency, কিন্তু consistent ও scalable।</li>
+<li><strong>Near Cache (Hybrid):</strong> দুটির সমন্বয় — একটি ছোট লোকাল ক্যাশ (দ্রুত) + পেছনে একটি distributed ক্যাশ (consistent)। বড় সিস্টেমে জনপ্রিয়।</li>
+</ul>
+<p><strong>Cache Topology নির্বাচন:</strong> একটি সার্ভার বা সর্বোচ্চ গতি দরকার → Local; একাধিক সার্ভারে consistency দরকার → Distributed; উভয় চাইলে → Near Cache।</p>
+<h3>৩.৩ Caching Patterns (ক্যাশিং প্যাটার্ন) — ৬টি প্রধান প্যাটার্ন</h3>
+<p>ক্যাশিং প্যাটার্নগুলোকে দুই দলে ভাগ করা যায় — <strong>Read Patterns</strong> (পড়ার সময় ক্যাশ কীভাবে কাজ করে) এবং <strong>Write Patterns</strong> (লেখার সময় ক্যাশ ও ডাটাবেস কীভাবে সিঙ্ক থাকে)। মোট ছয়টি মৌলিক প্যাটার্ন আছে।</p>
+<hr />
+<h4>🔵 Read Patterns (পড়ার প্যাটার্ন)</h4>
+<p><strong>১. Cache-Aside (Lazy Loading) — সবচেয়ে প্রচলিত:</strong><br />
+দায়িত্ব <strong>অ্যাপ্লিকেশনের</strong>। অ্যাপ প্রথমে ক্যাশ দেখে; miss হলে নিজে ডাটাবেস থেকে আনে, ক্যাশে রাখে, তারপর ব্যবহারকারীকে দেয়। ক্যাশ ও DB-এর মধ্যে সরাসরি কোনো সংযোগ নেই — অ্যাপই মধ্যস্থতাকারী।<br />
+- <em>সুবিধা:</em> শুধু চাহিদা অনুযায়ী (on-demand) ডাটাই ক্যাশ হয়; ক্যাশ ডাউন থাকলেও সিস্টেম চলে (DB থেকে আনা যায়)।<br />
+- <em>অসুবিধা:</em> প্রতিটি নতুন key-তে প্রথম অনুরোধে miss (cold start); ডাটাবেস সরাসরি আপডেট হলে ক্যাশ stale হতে পারে।<br />
+- <em>ব্যবহার:</em> read-heavy সাধারণ অ্যাপ্লিকেশন (এটিই সবচেয়ে বেশি ব্যবহৃত)।</p>
+<p><strong>২. Read-Through:</strong><br />
+দায়িত্ব <strong>ক্যাশ লাইব্রেরি/সিস্টেমের</strong>, অ্যাপের নয়। অ্যাপ শুধু ক্যাশের কাছে চায়; miss হলে <strong>ক্যাশ নিজেই</strong> ডাটাবেস থেকে এনে, নিজেকে আপডেট করে, ফেরত দেয়। অ্যাপের কাছে DB লজিক লুকানো থাকে।<br />
+- <em>সুবিধা:</em> অ্যাপ কোড পরিষ্কার থাকে (DB-fetch লজিক ক্যাশ স্তরে); Cache-Aside-এর পুনরাবৃত্ত কোড এড়ানো যায়।<br />
+- <em>অসুবিধা:</em> ক্যাশ প্রোভাইডারের সমর্থন (read-through provider) দরকার; এখানেও cold-start miss থাকে।<br />
+- <em>পার্থক্য:</em> Cache-Aside-এ অ্যাপ DB-কে ডাকে; Read-Through-এ ক্যাশ DB-কে ডাকে।</p>
+<hr />
+<h4>🟠 Write Patterns (লেখার প্যাটার্ন)</h4>
+<p><strong>৩. Write-Through:</strong><br />
+লেখা সবসময় ক্যাশের <strong>মধ্য দিয়ে</strong> যায় — অ্যাপ ক্যাশে লেখে, ক্যাশ সিঙ্ক্রোনাসভাবে DB-তে লেখে। ক্যাশ ও DB একসাথে আপডেট হয়।<br />
+- <em>সুবিধা:</em> ক্যাশ সবসময় তাজা (strong consistency); পড়া দ্রুত।<br />
+- <em>অসুবিধা:</em> প্রতিটি লেখা ধীর (দুই জায়গায় লিখতে হয়); যে ডাটা কখনো পড়াই হবে না তাও ক্যাশ হয় (cache pollution)।<br />
+- <em>ব্যবহার:</em> প্রায়ই Read-Through-এর সাথে জোড়ায় ব্যবহৃত হয়।</p>
+<p><strong>৪. Write-Around:</strong><br />
+লেখা সরাসরি <strong>ডাটাবেসে</strong> যায়, ক্যাশকে বাইপাস করে। ডাটা শুধু তখনই ক্যাশ হয় যখন পরে কেউ সেটি পড়ে (read miss-এর মাধ্যমে, Cache-Aside/Read-Through দিয়ে)।<br />
+- <em>সুবিধা:</em> "একবার লেখা, কম পড়া" ডাটায় ক্যাশ pollution রোধ করে; লেখা DB-গতিতেই চলে।<br />
+- <em>অসুবিধা:</em> সদ্য লেখা ডাটা প্রথমবার পড়ায় miss হবে (cache miss penalty)।<br />
+- <em>ব্যবহার:</em> যেখানে লেখা বেশি কিন্তু সাম্প্রতিক লেখা কম পড়া হয় (যেমন লগ, পুরোনো রেকর্ড)।</p>
+<p><strong>৫. Write-Behind (Write-Back):</strong><br />
+অ্যাপ আগে শুধু <strong>ক্যাশে</strong> লেখে (দ্রুত), তারপর ক্যাশ অ্যাসিঙ্ক্রোনাসভাবে (batch/delay সহ) DB-তে লেখে।<br />
+- <em>সুবিধা:</em> লেখা অত্যন্ত দ্রুত; একাধিক লেখা একত্র (batch) করে DB-লোড কমানো যায়।<br />
+- <em>অসুবিধা:</em> DB-তে persist হওয়ার আগে ক্যাশ ক্র্যাশ করলে ডাটা হারানোর ঝুঁকি; জটিলতা বেশি।<br />
+- <em>ব্যবহার:</em> উচ্চ write-throughput, যেখানে সামান্য ডাটা-হারানোর ঝুঁকি গ্রহণযোগ্য (যেমন view counter, metrics)।</p>
+<p><strong>৬. Refresh-Ahead:</strong><br />
+ক্যাশ সিস্টেম <strong>মেয়াদ (TTL) শেষ হওয়ার আগেই</strong>, ঘন-ব্যবহৃত key গুলোকে ব্যাকগ্রাউন্ডে আগাম রিফ্রেশ করে রাখে — যাতে ব্যবহারকারী কখনো miss-এর ধীরগতি না পায়।<br />
+- <em>সুবিধা:</em> জনপ্রিয় ডাটায় প্রায় সবসময় hit; latency কম ও স্থিতিশীল; Cache Stampede এড়াতে সাহায্য করে।<br />
+- <em>অসুবিধা:</em> কোন key আগাম রিফ্রেশ হবে তা ভুল অনুমান হলে অপ্রয়োজনীয় DB-লোড; বাস্তবায়ন জটিল।<br />
+- <em>ব্যবহার:</em> অনুমানযোগ্য, জনপ্রিয়, ঘন-পঠিত ডাটা (যেমন হোমপেজ, ট্রেন্ডিং)।</p>
+<hr />
+<p><strong>দ্রুত তুলনা সারণি:</strong></p>
+<table>
+<thead>
+<tr>
+<th>প্যাটার্ন</th>
+<th>দল</th>
+<th>মূল ধারণা</th>
+<th>সেরা যেখানে</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cache-Aside</td>
+<td>Read</td>
+<td>অ্যাপ ক্যাশ মিস হলে DB ডাকে</td>
+<td>সাধারণ read-heavy</td>
+</tr>
+<tr>
+<td>Read-Through</td>
+<td>Read</td>
+<td>ক্যাশ নিজেই DB ডাকে</td>
+<td>পরিষ্কার অ্যাপ কোড</td>
+</tr>
+<tr>
+<td>Write-Through</td>
+<td>Write</td>
+<td>ক্যাশের মধ্য দিয়ে DB-তে লেখা</td>
+<td>strong consistency</td>
+</tr>
+<tr>
+<td>Write-Around</td>
+<td>Write</td>
+<td>DB-তে সরাসরি, ক্যাশ বাইপাস</td>
+<td>write-heavy, কম পঠিত</td>
+</tr>
+<tr>
+<td>Write-Behind</td>
+<td>Write</td>
+<td>ক্যাশে লেখা, পরে async DB</td>
+<td>উচ্চ write throughput</td>
+</tr>
+<tr>
+<td>Refresh-Ahead</td>
+<td>Read</td>
+<td>মেয়াদের আগে আগাম রিফ্রেশ</td>
+<td>জনপ্রিয় hot data</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>বাস্তবে:</strong> এগুলো প্রায়ই <strong>জোড়ায়</strong> ব্যবহৃত হয় — যেমন <em>Read-Through + Write-Through</em> (সর্বোচ্চ consistency), অথবা <em>Cache-Aside + Write-Around</em> (read-heavy + কম pollution)। একটি প্যাটার্নই "সর্বশ্রেষ্ঠ" নয় — ডাটার read/write প্যাটার্ন অনুযায়ী নির্বাচন করতে হয়।</p>
+</blockquote>
+<h3>৩.৪ Redis vs Memcached</h3>
+<p>দুটোই জনপ্রিয় in-memory distributed cache।</p>
+<table>
+<thead>
+<tr>
+<th>বৈশিষ্ট্য</th>
+<th>Redis</th>
+<th>Memcached</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ডাটা টাইপ</td>
+<td>সমৃদ্ধ (String, List, Set, Hash, Sorted Set)</td>
+<td>শুধু String/key-value</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td>আছে (ডিস্কে সংরক্ষণ সম্ভব)</td>
+<td>নেই (শুধু মেমরি)</td>
+</tr>
+<tr>
+<td>Replication</td>
+<td>আছে</td>
+<td>সীমিত</td>
+</tr>
+<tr>
+<td>Multi-threading</td>
+<td>মূলত single-threaded (নতুন সংস্করণে কিছু থ্রেডিং)</td>
+<td>Multi-threaded</td>
+</tr>
+<tr>
+<td>ব্যবহার</td>
+<td>ক্যাশ + আরও (queue, pub/sub, leaderboard)</td>
+<td>শুধু সরল ক্যাশ</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>সংক্ষেপে:</strong> শুধু সরল key-value ক্যাশ ও সর্বোচ্চ সরলতা চাইলে → <strong>Memcached</strong>। সমৃদ্ধ ফিচার, persistence, ও বহুমুখী ব্যবহার চাইলে → <strong>Redis</strong> (বর্তমানে অধিক জনপ্রিয়)।</p>
+</blockquote>
+<h3>৩.৫ Cache Invalidation (ক্যাশ অকার্যকরকরণ)</h3>
+<p>ক্যাশের ডাটা মূল ডাটাবেসের সাথে পুরোনো (stale) হয়ে যেতে পারে। <strong>Invalidation</strong> হলো পুরোনো ক্যাশ মুছে বা আপডেট করার কৌশল।</p>
+<p><strong>প্রধান কৌশল:</strong></p>
+<ul>
+<li><strong>TTL (Time To Live):</strong> প্রতিটি ক্যাশ এন্ট্রির একটি মেয়াদ দেওয়া হয় (যেমন ৬০ সেকেন্ড); মেয়াদ শেষে স্বয়ংক্রিয়ভাবে মুছে যায়। সবচেয়ে সহজ ও প্রচলিত।</li>
+<li><strong>Write Invalidation:</strong> ডাটাবেস আপডেটের সময় সংশ্লিষ্ট ক্যাশ এন্ট্রি মুছে ফেলা।</li>
+<li><strong>Eviction Policies (জায়গা ফুরালে):</strong> ক্যাশ ভরে গেলে কোনটি সরানো হবে —</li>
+<li><strong>LRU (Least Recently Used):</strong> যেটি সবচেয়ে আগে (অনেকক্ষণ) ব্যবহৃত হয়েছে — সবচেয়ে প্রচলিত।</li>
+<li><strong>LFU (Least Frequently Used):</strong> যেটি সবচেয়ে কম বার ব্যবহৃত হয়।</li>
+<li><strong>FIFO (First In First Out):</strong> যেটি সবচেয়ে আগে ঢুকেছে।</li>
+<li><strong>Random:</strong> এলোমেলোভাবে একটি সরানো (সরল, কম খরচে)।</li>
+</ul>
+<h3>৩.৬ ক্যাশের প্রধান সমস্যা (Cache Problems) ও সমাধান</h3>
+<p>প্রোডাকশন ক্যাশিংয়ে চারটি বিখ্যাত সমস্যা আছে — সিনিয়র ইন্টারভিউতে এগুলো প্রায়ই জিজ্ঞাসা করা হয়।</p>
+<p><strong>১. Cache Penetration (ক্যাশ পেনিট্রেশন):</strong><br />
+যে key ক্যাশেও নেই, DB-তেও নেই (অস্তিত্বহীন/ভুয়া id) — এমন অনুরোধ প্রতিবার ক্যাশ মিস করে সরাসরি DB-তে যায়। আক্রমণকারী ইচ্ছাকৃতভাবে এমন করে DB ধসাতে পারে।<br />
+- <em>সমাধান:</em> "not found" ফলাফলও সংক্ষিপ্ত TTL দিয়ে ক্যাশ করুন (null caching); অথবা <strong>Bloom Filter</strong> দিয়ে আগেই বাতিল করুন।</p>
+<p><strong>২. Cache Avalanche (ক্যাশ অ্যাভালাঞ্চ):</strong><br />
+বহু key একসাথে একই সময়ে মেয়াদোত্তীর্ণ হয় (যেমন সবগুলোর TTL একই সময়ে শেষ), ফলে হঠাৎ বিপুল অনুরোধ একসাথে DB-তে আছড়ে পড়ে।<br />
+- <em>সমাধান:</em> TTL-এ এলোমেলো <strong>jitter</strong> যোগ করুন (যেমন ৬০ ± ১০ সেকেন্ড) যাতে মেয়াদ ছড়িয়ে যায়; ক্যাশ ক্লাস্টার redundant রাখুন।</p>
+<p><strong>৩. Cache Stampede / Thundering Herd:</strong><br />
+একটি <strong>জনপ্রিয়</strong> (hot) key মেয়াদোত্তীর্ণ হওয়ামাত্র হাজারো অনুরোধ একসাথে miss করে DB-তে যায়।<br />
+- <em>সমাধান:</em> <strong>Lock/Mutex</strong> দিয়ে শুধু একটি অনুরোধকে DB থেকে আনতে দিন (বাকিরা অপেক্ষা করে); অথবা <strong>Refresh-Ahead</strong> ব্যবহার করুন।</p>
+<p><strong>৪. Hot Key / Big Key:</strong><br />
+- <em>Hot Key:</em> একটি key এত জনপ্রিয় যে সেটি যে ক্যাশ নোডে আছে সেই নোডই overload হয়। <em>সমাধান:</em> key-টি একাধিক নোডে replicate করুন বা লোকাল ক্যাশে রাখুন।<br />
+- <em>Big Key:</em> একটি key-তে বিশাল ডাটা (যেমন বিশাল list) যা নেটওয়ার্ক ও মেমরি চাপ দেয়। <em>সমাধান:</em> বড় ডাটা ছোট অংশে ভাগ করুন।</p>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনার নিউজ সাইটের হোমপেজ প্রতি সেকেন্ডে ৫০,০০০ বার লোড হয়। প্রতিবার হোমপেজ বানাতে ডাটাবেসে ২০টি query চলে। অর্থাৎ প্রতি সেকেন্ডে ১০ লক্ষ query — কোনো ডাটাবেসই এটা টিকতে পারবে না।</p>
+<p>কিন্তু হোমপেজ তো প্রতি সেকেন্ডে বদলায় না! সমাধান:</p>
+<ul>
+<li>তৈরি হোমপেজটি Redis-এ <strong>৩০ সেকেন্ড TTL</strong> দিয়ে ক্যাশ করুন।</li>
+<li>৩০ সেকেন্ডে একবার ডাটাবেস হিট হবে, বাকি ১৫ লক্ষ অনুরোধ ক্যাশ থেকে মিলিসেকেন্ডে যাবে।</li>
+</ul>
+<p>ফলাফল: ডাটাবেস লোড ৯৯.৯৯%+ কমে গেল, latency নাটকীয়ভাবে কমল। এটিই caching-এর জাদু — কম খরচে বিশাল scaling।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>Cache-Aside প্যাটার্ন</h3>
+<pre><code>        +--------+
+        | Client |
+        +--------+
+            |
+            v
+      +-----------+      Cache Hit (দ্রুত)
+      |  App      |----------------------+
+      |  Server   |                      |
+      +-----------+                      v
+        |   ^                      +-----------+
+ Miss   |   | ডাটা রাখা            |   Cache   |
+        v   |                      | (Redis)   |
+      +-----------+                +-----------+
+      | Database  |
+      +-----------+
+</code></pre>
+<h3>Mermaid: Cache-Aside অনুরোধ প্রবাহ</h3>
+<div class="mermaid">graph TD
+    A[Client Request] --> B{ক্যাশে আছে?}
+    B -->|Hit| C[ক্যাশ থেকে ফেরত - দ্রুত]
+    B -->|Miss| D[ডাটাবেস থেকে আনা]
+    D --> E[ক্যাশে সংরক্ষণ TTL সহ]
+    E --> F[ব্যবহারকারীকে ফেরত]</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> Client, App Server, Cache (Redis), Database।<br />
+- <strong>Request Flow:</strong> অ্যাপ আগে ক্যাশ দেখে → Hit হলে দ্রুত ফেরত; Miss হলে DB থেকে এনে ক্যাশে রেখে ফেরত।<br />
+- <strong>Failure Points:</strong> ক্যাশ ডাউন হলে সব অনুরোধ সরাসরি DB-তে যাবে (cache stampede ঝুঁকি) — তাই ক্যাশকেও redundant করা হয়।<br />
+- <strong>Scaling:</strong> ক্যাশ DB-এর লোড নাটকীয়ভাবে কমায়, ফলে কম রিসোর্সে বেশি throughput।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>Cache-Aside প্যাটার্ন (Python + Redis)</h3>
+<pre><code class="language-python">import redis, json
+
+cache = redis.Redis(host='localhost', port=6379)
+
+def get_user(user_id):
+    key = f&quot;user:{user_id}&quot;
+
+    # ১. আগে ক্যাশ দেখা
+    cached = cache.get(key)
+    if cached:
+        return json.loads(cached)        # Cache Hit — দ্রুত
+
+    # ২. Cache Miss — ডাটাবেস থেকে আনা
+    user = db_fetch_user(user_id)        # ধীর ডাটাবেস কল
+
+    # ৩. ক্যাশে রাখা, ৬০ সেকেন্ড TTL সহ
+    cache.setex(key, 60, json.dumps(user))
+    return user
+
+def update_user(user_id, data):
+    db_update_user(user_id, data)        # ডাটাবেস আপডেট
+    cache.delete(f&quot;user:{user_id}&quot;)      # পুরোনো ক্যাশ মুছে ফেলা (invalidation)
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong><br />
+- প্রথমে <code>cache.get</code> দিয়ে ক্যাশ পরীক্ষা — পেলে সরাসরি ফেরত (hit)।<br />
+- না পেলে DB থেকে এনে <code>setex</code> দিয়ে <strong>৬০ সেকেন্ড TTL</strong>-সহ ক্যাশে রাখা।<br />
+- <code>update_user</code>-এ ডাটাবেস বদলানোর পর <code>cache.delete</code> দিয়ে পুরোনো ক্যাশ মুছে ফেলা হয় — এটিই <strong>write invalidation</strong>, যা stale data রোধ করে।</p>
+<p><strong>সীমাবদ্ধতা:</strong> TTL উইন্ডোতে ক্যাশ সামান্য stale থাকতে পারে; কঠোর তাজা ডাটা দরকার হলে TTL কমাতে হবে বা write-through ব্যবহার করতে হবে।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Facebook (Memcached):</strong> বিশ্বের অন্যতম বৃহৎ Memcached স্থাপনা চালায় — কোটি কোটি অনুরোধ ক্যাশ থেকে দিয়ে ডাটাবেস লোড কমায়।</li>
+<li><strong>Twitter/X:</strong> টাইমলাইন ও জনপ্রিয় টুইট ক্যাশে রাখে Redis দিয়ে, যাতে ভাইরাল কনটেন্ট ডাটাবেসকে ধসিয়ে না দেয়।</li>
+<li><strong>Instagram:</strong> Redis ব্যবহার করে ফিড ও সম্পর্ক (following) দ্রুত পরিবেশন করতে।</li>
+<li><strong>GitHub:</strong> repository ও session ডাটার জন্য Redis-এর ওপর ব্যাপকভাবে নির্ভরশীল।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- TTL ছাড়া ক্যাশ করা — ফলে চিরকাল stale ডাটা থাকা।<br />
+- ডাটাবেস আপডেটের পর ক্যাশ invalidate না করা।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- ভুল জিনিস ক্যাশ করা (যা ঘন ঘন বদলায় বা কম পড়া হয়)।<br />
+- ক্যাশকেই একমাত্র উৎস ধরে নেওয়া (ক্যাশ ডাউন হলে ব্যাকআপ পরিকল্পনা না থাকা)।</p>
+<p><strong>Production Mistakes:</strong><br />
+- <strong>Cache Stampede / Thundering Herd:</strong> একটি জনপ্রিয় key-এর TTL শেষ হওয়ামাত্র হাজারো অনুরোধ একসাথে DB-তে আছড়ে পড়া।<br />
+- <strong>Cache Avalanche:</strong> সব key-এর TTL একই সময়ে সেট করা — ফলে একসাথে সব মেয়াদোত্তীর্ণ (jitter না দেওয়া)।<br />
+- <strong>Cache Penetration:</strong> অস্তিত্বহীন key-এর জন্য "not found" ক্যাশ না করা — প্রতিবার DB হিট।<br />
+- ক্যাশকে redundant না করা — Single Point of Failure।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- in-process (local) ক্যাশের ওপর নির্ভর করা যখন একাধিক সার্ভার আছে — প্রতিটি সার্ভারে আলাদা ক্যাশ মানে inconsistency।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- সংবেদনশীল ডাটা (যেমন password) ক্যাশে রাখা।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>Cache Hit ও Cache Miss কী?</em></p>
+<blockquote>
+<p>Hit = ডাটা ক্যাশে পাওয়া গেছে (দ্রুত)। Miss = ক্যাশে নেই, মূল উৎস থেকে আনতে হয় (ধীর)।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Redis আর Memcached-এর মধ্যে কখন কোনটি বেছে নেবেন?</em></p>
+<blockquote>
+<p>সরল key-value ক্যাশ ও সর্বোচ্চ সরলতার জন্য Memcached; সমৃদ্ধ ডাটা টাইপ, persistence, replication বা pub/sub দরকার হলে Redis।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Cache-Aside আর Read-Through-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>দুটোই read miss-এ DB থেকে আনে, কিন্তু দায়িত্ব ভিন্ন — Cache-Aside-এ <strong>অ্যাপ্লিকেশন</strong> DB ডাকে ও ক্যাশ আপডেট করে; Read-Through-এ <strong>ক্যাশ সিস্টেম নিজেই</strong> DB ডাকে, অ্যাপ শুধু ক্যাশের কাছে চায়।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Write-Around আর Write-Behind কখন ব্যবহার করবেন?</em></p>
+<blockquote>
+<p>Write-Around — যখন লেখা বেশি কিন্তু সাম্প্রতিক ডাটা কম পড়া হয় (ক্যাশ pollution রোধে)। Write-Behind — যখন অত্যন্ত দ্রুত লেখা দরকার এবং সামান্য ডাটা-হারানোর ঝুঁকি গ্রহণযোগ্য (যেমন counter, metrics)।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>Cache Stampede কী এবং কীভাবে রোধ করবেন?</em></p>
+<blockquote>
+<p>একটি জনপ্রিয় ক্যাশ key মেয়াদোত্তীর্ণ হওয়ামাত্র বহু অনুরোধ একসাথে DB-তে গিয়ে চাপ তৈরি করে। সমাধান: lock/mutex দিয়ে শুধু একটি অনুরোধকে DB-তে যেতে দেওয়া, অথবা মেয়াদের সামান্য আগে ব্যাকগ্রাউন্ডে ক্যাশ refresh করা।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি জনপ্রিয় ভিডিও প্ল্যাটফর্মের view count কীভাবে ক্যাশ করবেন?</em></p>
+<blockquote>
+<p>Redis-এর atomic counter (<code>INCR</code>) ব্যবহার করে দ্রুত count বাড়ানো, এবং পর্যায়ক্রমে (batch) ডাটাবেসে persist করা। এতে প্রতিটি view-তে DB write এড়ানো যায়।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>সর্বদা TTL সেট করুন</strong> — অসীম ক্যাশ এড়ান।</li>
+<li><strong>ডাটাবেস আপডেটে ক্যাশ invalidate করুন</strong> (delete বা update)।</li>
+<li><strong>যা ঘন পড়া হয় ও কম বদলায়</strong> তা ক্যাশ করুন — সবকিছু নয়।</li>
+<li><strong>Distributed cache ব্যবহার করুন</strong> (Redis) একাধিক সার্ভারে, in-process নয়।</li>
+<li><strong>ক্যাশকে redundant করুন</strong> (replication) — Single Point of Failure এড়াতে।</li>
+<li><strong>Cache Stampede রোধ করুন</strong> lock বা early refresh দিয়ে।</li>
+<li><strong>সংবেদনশীল ডাটা ক্যাশ করবেন না।</strong></li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Cache</strong> = দ্রুত, সাময়িক স্টোরেজ (সাধারণত RAM) যা মূল উৎসের লোড কমায়।<br />
+- <strong>Topologies:</strong> Local (in-process), Distributed (Redis/Memcached), Near Cache (hybrid)।<br />
+- <strong>Cache Hit/Miss</strong> ও <strong>Hit Ratio</strong> পারফরম্যান্সের সূচক।<br />
+- <strong>৬টি প্যাটার্ন:</strong> Read — Cache-Aside, Read-Through; Write — Write-Through, Write-Around, Write-Behind; এবং Refresh-Ahead।<br />
+- <strong>Redis</strong> = সমৃদ্ধ ও বহুমুখী; <strong>Memcached</strong> = সরল ও দ্রুত।<br />
+- <strong>Cache Invalidation</strong> = TTL, write invalidation, eviction policy (LRU/LFU/FIFO/Random)।<br />
+- <strong>৪টি সমস্যা:</strong> Penetration (Bloom Filter/null cache), Avalanche (TTL jitter), Stampede (lock/refresh-ahead), Hot/Big Key (replicate/split)।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> Cache, Hit, Miss, Hit Ratio, Cache-Aside, Read-Through, Write-Through, Write-Around, Write-Behind, Refresh-Ahead, TTL, LRU, Eviction, Near Cache, Cache Penetration, Avalanche, Stampede, Hot Key, Bloom Filter।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. Cache-Aside ও Write-Through প্যাটার্নের পার্থক্য ও ট্রেড-অফ লিখুন।<br />
+2. কেন প্রতিটি ক্যাশ এন্ট্রিতে TTL দেওয়া গুরুত্বপূর্ণ?</p>
+<p><strong>Practical:</strong><br />
+3. উপরের Python উদাহরণে একটি <code>get_product(product_id)</code> ফাংশন লিখুন যা Cache-Aside প্যাটার্ন অনুসরণ করে।<br />
+4. LRU eviction কীভাবে কাজ করে — একটি ৩-আকারের ক্যাশে ধাপে ধাপে দেখান।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি ই-কমার্স পণ্য পেজের জন্য caching স্তর ডিজাইন করুন — কোথায় ক্যাশ, কী TTL, কখন invalidate।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার একটি ভাইরাল পোস্টের ক্যাশ TTL শেষ হলেই DB CPU ১০০% হয়ে যায়। এটি কোন সমস্যা এবং কীভাবে সমাধান করবেন?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন "cache invalidation is hard" — একটি বাস্তব stale-data পরিস্থিতি দিয়ে।</p>
+<hr />
+<p><strong>অধ্যায় ৫ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

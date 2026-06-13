@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ১১: Circuit Breakers, Retries, Timeouts, Rate Limiting ও Throttling — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html" class="active"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ১১
+      </div>
+      <div class="page-nav">
+        <a href="chapter-10.html">← আগের অধ্যায়</a>
+        <a href="chapter-12.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ১১</div>
+      <h1>অধ্যায় ১১: Circuit Breakers, Retries, Timeouts, Rate Limiting ও Throttling</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>এতক্ষণ আমরা শিখেছি কীভাবে সিস্টেমকে দ্রুত ও বড় করা যায়। কিন্তু একটি কঠিন সত্য আছে: <strong>distributed system-এ ব্যর্থতা অনিবার্য</strong>। সার্ভার ক্র্যাশ করবে, নেটওয়ার্ক ধীর হবে, একটি সার্ভিস হঠাৎ সাড়া দেবে না। প্রশ্ন "ব্যর্থতা হবে কি না" নয়, প্রশ্ন "ব্যর্থতা হলে আপনার সিস্টেম কীভাবে আচরণ করবে"।</p>
+<p>একটি খারাপভাবে ডিজাইন করা সিস্টেমে একটি ছোট সার্ভিসের ব্যর্থতা পুরো সিস্টেমকে ধসিয়ে দিতে পারে — একে বলে <strong>Cascading Failure (ক্যাসকেডিং ব্যর্থতা)</strong>। যেমন একটি ধীর ডাটাবেস → সব অ্যাপ সার্ভার অপেক্ষায় আটকে → সব থ্রেড শেষ → পুরো সিস্টেম ডাউন।</p>
+<p>এই অধ্যায়ে আমরা শিখব <strong>resilience pattern</strong> — যেসব কৌশল ব্যর্থতাকে স্থানীয় ও নিয়ন্ত্রিত রাখে: <strong>Timeouts, Retries, Circuit Breakers</strong>। সাথে শিখব ট্র্যাফিক নিয়ন্ত্রণের কৌশল — <strong>Rate Limiting ও Throttling</strong> — যা সিস্টেমকে অতিরিক্ত চাপ ও অপব্যবহার থেকে রক্ষা করে। এগুলো একটি "কাজ করে" সিস্টেম আর একটি "প্রোডাকশন-গ্রেড নির্ভরযোগ্য" সিস্টেমের মধ্যে পার্থক্য গড়ে দেয়।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>Cascading Failure</strong> কী এবং কেন এটি বিপজ্জনক</li>
+<li><strong>Timeout</strong> কেন প্রতিটি দূরবর্তী কলে অপরিহার্য</li>
+<li><strong>Retry</strong> কৌশল — exponential backoff, jitter, idempotency</li>
+<li><strong>Circuit Breaker</strong> প্যাটার্ন ও এর তিনটি অবস্থা</li>
+<li><strong>Bulkhead</strong> ও <strong>Fallback</strong> প্যাটার্ন (সম্পর্কিত resilience)</li>
+<li><strong>Rate Limiting</strong> ও এর অ্যালগরিদম (Token Bucket, Leaky Bucket, Window-based)</li>
+<li><strong>Throttling</strong> এবং Rate Limiting-এর সাথে পার্থক্য</li>
+<li>কোথায় ও কীভাবে এগুলো প্রয়োগ করতে হয়</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ সমস্যা: Cascading Failure</h3>
+<p><strong>Cascading Failure</strong> হলো এমন একটি শৃঙ্খল প্রতিক্রিয়া যেখানে একটি উপাদানের ব্যর্থতা পরবর্তী উপাদানগুলোকে একে একে ব্যর্থ করে, শেষে পুরো সিস্টেম ধসে পড়ে।</p>
+<p>উদাহরণ: Service B ধীর হয়ে গেল। Service A, B-কে ডেকে উত্তরের জন্য অপেক্ষা করে। অপেক্ষারত অনুরোধ জমতে থাকে, A-এর সব থ্রেড/connection আটকে যায়, এখন A-ও সাড়া দেয় না, এবং A-কে যারা ডাকে তারাও আটকে যায় — এভাবে ব্যর্থতা ছড়িয়ে পড়ে।</p>
+<p>resilience pattern-গুলোর মূল লক্ষ্য — এই শৃঙ্খল <strong>ভেঙে দেওয়া</strong>, ব্যর্থতাকে একটি স্থানে সীমাবদ্ধ রাখা।</p>
+<h3>৩.২ Timeout (সময়সীমা)</h3>
+<p><strong>Timeout</strong> হলো একটি দূরবর্তী কলের জন্য সর্বোচ্চ অপেক্ষার সময় নির্ধারণ — এর মধ্যে উত্তর না এলে কলটি ব্যর্থ ধরে নেওয়া হয়।</p>
+<p><strong>কেন অপরিহার্য:</strong> timeout ছাড়া একটি ধীর/আটকে যাওয়া সার্ভিসের জন্য অনুরোধ চিরকাল অপেক্ষা করতে পারে, রিসোর্স (থ্রেড, connection) আটকে রেখে cascading failure ঘটায়।</p>
+<p><strong>প্রকার:</strong><br />
+- <strong>Connection Timeout:</strong> সংযোগ স্থাপনে সর্বোচ্চ সময়।<br />
+- <strong>Read/Request Timeout:</strong> উত্তর পেতে সর্বোচ্চ সময়।</p>
+<blockquote>
+<p><strong>নিয়ম:</strong> প্রতিটি নেটওয়ার্ক কলে সবসময় একটি যুক্তিসঙ্গত timeout সেট করুন — কখনো "অসীম অপেক্ষা" রাখবেন না।</p>
+</blockquote>
+<h3>৩.৩ Retry (পুনঃচেষ্টা)</h3>
+<p><strong>Retry</strong> হলো একটি ব্যর্থ অনুরোধ আবার চেষ্টা করা — কারণ অনেক ব্যর্থতা <strong>ক্ষণস্থায়ী (transient)</strong> (সাময়িক নেটওয়ার্ক সমস্যা, মুহূর্তের overload)।</p>
+<p>কিন্তু অসতর্ক retry বিপজ্জনক — তাই কিছু নিয়ম:</p>
+<ul>
+<li><strong>Exponential Backoff:</strong> প্রতিবার retry-এর মধ্যে অপেক্ষা ক্রমশ বাড়ানো (১স → ২স → ৪স → ৮স) — যাতে ইতিমধ্যে চাপে থাকা সার্ভিসকে আরও চাপ না দেওয়া হয়।</li>
+<li><strong>Jitter (এলোমেলোতা):</strong> backoff-এ সামান্য random সময় যোগ করা — যাতে সব client একই সাথে retry করে <strong>"thundering herd"</strong> (একযোগে আঘাত) তৈরি না করে।</li>
+<li><strong>Max Retries:</strong> সীমা নির্ধারণ — অসীম retry সিস্টেম ধসিয়ে দিতে পারে।</li>
+<li><strong>Idempotency অপরিহার্য:</strong> retry মানে একই অনুরোধ একাধিকবার যেতে পারে; তাই অপারেশন idempotent হতে হবে (যেমন একই পেমেন্ট দুবার চার্জ না হওয়া — অধ্যায় ১৪)।</li>
+<li><strong>শুধু retry-যোগ্য ব্যর্থতায়:</strong> 5xx/timeout retry করুন; কিন্তু 4xx (যেমন 400 Bad Request) retry করা অর্থহীন — তা আবারও ব্যর্থ হবে।</li>
+</ul>
+<h3>৩.৪ Circuit Breaker (সার্কিট ব্রেকার)</h3>
+<p>বৈদ্যুতিক সার্কিট ব্রেকারের মতো — অতিরিক্ত সমস্যা হলে এটি "trip" করে প্রবাহ বন্ধ করে দেয়, যাতে বড় ক্ষতি না হয়।</p>
+<p><strong>Circuit Breaker</strong> একটি প্যাটার্ন যা একটি ব্যর্থ/ধীর সার্ভিসে কল করা <strong>সাময়িকভাবে বন্ধ</strong> করে দেয় — যাতে অসুস্থ সার্ভিসকে পুনরুদ্ধারের সুযোগ দেওয়া যায় এবং caller অর্থহীন অপেক্ষায় রিসোর্স নষ্ট না করে।</p>
+<p><strong>তিনটি অবস্থা (state):</strong><br />
+1. <strong>Closed (বন্ধ — স্বাভাবিক):</strong> সব অনুরোধ যথারীতি যায়। ব্যর্থতা গণনা করা হয়; নির্দিষ্ট সীমা (threshold) ছাড়ালে → Open।<br />
+2. <strong>Open (খোলা — অবরুদ্ধ):</strong> কোনো অনুরোধই সার্ভিসে যায় না; তৎক্ষণাৎ ব্যর্থ/fallback দেওয়া হয় (fail fast)। একটি নির্দিষ্ট সময় পর → Half-Open।<br />
+3. <strong>Half-Open (অর্ধ-খোলা — পরীক্ষা):</strong> কিছু পরীক্ষামূলক অনুরোধ পাঠানো হয়। সফল হলে সার্ভিস সুস্থ → Closed; ব্যর্থ হলে আবার → Open।</p>
+<p><strong>সুবিধা:</strong> "fail fast" — অসুস্থ সার্ভিসে অপেক্ষা না করে দ্রুত ব্যর্থ হওয়া; cascading failure রোধ; সার্ভিসকে পুনরুদ্ধারের শ্বাস দেওয়া।</p>
+<h3>৩.৫ সম্পর্কিত Resilience প্যাটার্ন</h3>
+<ul>
+<li><strong>Fallback (বিকল্প):</strong> কল ব্যর্থ হলে একটি বিকল্প/ডিফল্ট উত্তর দেওয়া (যেমন রিকমেন্ডেশন সার্ভিস ডাউন হলে জনপ্রিয় আইটেম দেখানো)। Circuit breaker-এর Open অবস্থায় প্রায়ই fallback ব্যবহৃত হয়। (graceful degradation — অধ্যায় ১২)</li>
+<li><strong>Bulkhead (জলযানের জলরোধী কুঠুরি):</strong> রিসোর্সকে আলাদা পুলে ভাগ করা, যাতে একটি অংশের ব্যর্থতা অন্য অংশকে প্রভাবিত না করে। যেমন প্রতিটি ডাউনস্ট্রিম সার্ভিসের জন্য আলাদা thread pool — একটি সার্ভিস সব thread খেয়ে ফেলতে পারবে না।</li>
+<li><strong>Deadline Propagation:</strong> একটি অনুরোধের মোট সময়সীমা চেইনের সব সার্ভিসে ছড়িয়ে দেওয়া, যাতে কেউ মূল deadline পেরিয়ে কাজ চালিয়ে না যায়।</li>
+</ul>
+<h3>৩.৬ Rate Limiting (হার সীমিতকরণ)</h3>
+<p><strong>Rate Limiting</strong> হলো একটি client/ব্যবহারকারী একটি নির্দিষ্ট সময়ে সর্বোচ্চ কতগুলো অনুরোধ করতে পারবে তা সীমিত করা (যেমন "প্রতি মিনিটে ১০০ অনুরোধ")। সীমা ছাড়ালে অতিরিক্ত অনুরোধ প্রত্যাখ্যান করা হয় (সাধারণত <code>429 Too Many Requests</code>)।</p>
+<p><strong>কেন দরকার:</strong><br />
+- <strong>অপব্যবহার রোধ:</strong> brute-force, scraping, DDoS থেকে রক্ষা।<br />
+- <strong>ন্যায্যতা (fairness):</strong> এক ব্যবহারকারী সব রিসোর্স খেয়ে ফেলতে পারবে না।<br />
+- <strong>খরচ ও স্থিতিশীলতা:</strong> সিস্টেমকে overload থেকে রক্ষা; খরচ নিয়ন্ত্রণ।</p>
+<p><strong>Rate Limiting অ্যালগরিদম:</strong></p>
+<ol>
+<li><strong>Token Bucket:</strong> একটি বালতিতে নির্দিষ্ট হারে token যোগ হয়; প্রতিটি অনুরোধ একটি token খরচ করে; বালতি খালি হলে অনুরোধ বাতিল। <em>burst সহ্য করে (জমা token দিয়ে); সবচেয়ে জনপ্রিয়।</em></li>
+<li><strong>Leaky Bucket:</strong> অনুরোধ একটি কিউতে জমা হয় ও নির্দিষ্ট স্থির হারে "leak" (প্রক্রিয়া) হয়; কিউ ভরে গেলে বাতিল। <em>আউটপুট হার মসৃণ ও স্থির রাখে।</em></li>
+<li><strong>Fixed Window Counter:</strong> প্রতিটি স্থির সময় উইন্ডোতে (যেমন প্রতি মিনিট) গণনা; সীমা ছাড়ালে বাতিল। <em>সরল, কিন্তু উইন্ডোর সীমানায় burst সমস্যা (boundary spike)।</em></li>
+<li><strong>Sliding Window Log/Counter:</strong> চলমান উইন্ডোতে অনুরোধ গণনা — fixed window-এর boundary সমস্যা সমাধান করে, আরও সঠিক।</li>
+</ol>
+<h3>৩.৭ Throttling (থ্রটলিং)</h3>
+<p><strong>Throttling</strong> হলো অনুরোধের প্রবাহ নিয়ন্ত্রণ/ধীর করা — সীমা ছাড়ালে অনুরোধ একেবারে বাতিল না করে <strong>বিলম্বিত (queue/slow down)</strong> করা বা হার কমানো।</p>
+<p><strong>Rate Limiting vs Throttling (সূক্ষ্ম পার্থক্য):</strong><br />
+- <strong>Rate Limiting</strong> সাধারণত সীমা ছাড়ালে অনুরোধ <strong>প্রত্যাখ্যান</strong> করে (reject, 429)।<br />
+- <strong>Throttling</strong> প্রায়ই অনুরোধকে <strong>ধীর/বিলম্বিত</strong> করে বা মসৃণ করে (delay/queue), একেবারে বাতিল না করে।<br />
+- বাস্তবে দুটি শব্দ প্রায়ই একসাথে/বিনিময়যোগ্যভাবে ব্যবহৃত হয়; মূল ধারণা — প্রবাহ নিয়ন্ত্রণ।</p>
+<p><strong>Throttling-এর প্রকার:</strong><br />
+- <strong>Hard Throttling:</strong> কঠোর সীমা; অতিরিক্ত একেবারে বাতিল।<br />
+- <strong>Soft Throttling:</strong> সীমা সামান্য অতিক্রম সহনীয় (burst সহ)।<br />
+- <strong>Server-side vs Client-side:</strong> সার্ভার নিজেকে রক্ষা করে; client নিজে হার নিয়ন্ত্রণ করে (যেমন backoff)।</p>
+<h3>৩.৮ কোথায় প্রয়োগ করবেন</h3>
+<ul>
+<li><strong>Distributed Rate Limiting:</strong> একাধিক সার্ভারে সমন্বিত সীমা রক্ষায় একটি শেয়ারড স্টোর (যেমন <strong>Redis</strong>) ব্যবহার করা হয় — যাতে গণনা সব সার্ভারে সামঞ্জস্যপূর্ণ থাকে।</li>
+<li><strong>স্তর:</strong> rate limiting/throttling সাধারণত <strong>API Gateway</strong> বা Load Balancer স্তরে প্রয়োগ হয় (অধ্যায় ১৫); resilience pattern (retry, circuit breaker, timeout) প্রায়ই client/সার্ভিস স্তরে।</li>
+</ul>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনার ই-কমার্স সাইটের checkout, একটি তৃতীয় পক্ষের payment gateway-এর ওপর নির্ভরশীল। হঠাৎ gateway ধীর হয়ে গেল (১০ সেকেন্ডে সাড়া)।</p>
+<p><strong>Resilience ছাড়া:</strong> প্রতিটি checkout অনুরোধ ১০ সেকেন্ড অপেক্ষা করে; ব্যবহারকারীরা বারবার চেষ্টা করেন (manual retry); আপনার সার্ভারের সব থ্রেড gateway-এর জন্য অপেক্ষায় আটকে; checkout ছাড়াও পুরো সাইট ডাউন হয়ে যায় — cascading failure।</p>
+<p><strong>Resilience সহ:</strong><br />
+- <strong>Timeout:</strong> ২ সেকেন্ডে সাড়া না এলে কল ব্যর্থ ধরা — থ্রেড দ্রুত মুক্ত হয়।<br />
+- <strong>Retry (backoff + jitter):</strong> ক্ষণস্থায়ী হলে সামান্য বিলম্বে আবার চেষ্টা, কিন্তু সীমিতবার।<br />
+- <strong>Circuit Breaker:</strong> gateway বারবার ব্যর্থ হলে circuit "Open" হয়; এখন আর gateway-কে ডাকা হয় না — তৎক্ষণাৎ ব্যবহারকারীকে "পরে চেষ্টা করুন" বার্তা (fail fast + fallback)। বাকি সাইট (browsing, cart) স্বাভাবিক চলে।<br />
+- কিছুক্ষণ পর Half-Open অবস্থায় পরীক্ষা; gateway সুস্থ হলে আবার স্বাভাবিক।<br />
+- <strong>Rate Limiting:</strong> কোনো একক client অস্বাভাবিক বেশি অনুরোধ করলে তাকে সীমিত করা — সিস্টেম রক্ষা।</p>
+<p>ফল: একটি নির্ভরতার ব্যর্থতা একটি ফিচারে (checkout) সীমাবদ্ধ থাকে, পুরো সিস্টেম নয়। এটিই resilient ডিজাইনের শক্তি।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>Circuit Breaker State Machine</h3>
+<div class="mermaid">stateDiagram-v2
+    [*] --> Closed
+    Closed --> Open: ব্যর্থতা threshold ছাড়াল
+    Open --> HalfOpen: timeout পেরোলো
+    HalfOpen --> Closed: পরীক্ষা সফল
+    HalfOpen --> Open: পরীক্ষা ব্যর্থ</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Closed:</strong> স্বাভাবিক প্রবাহ; ব্যর্থতা গণনা।<br />
+- <strong>Open:</strong> সব কল তৎক্ষণাৎ ব্যর্থ (fail fast); সার্ভিসকে শ্বাস দেওয়া।<br />
+- <strong>Half-Open:</strong> সীমিত পরীক্ষা; সফলে Closed, ব্যর্থে Open।<br />
+- <strong>Failure handling:</strong> এটি cascading failure ভেঙে দেয় — caller অসুস্থ সার্ভিসে আটকে থাকে না।</p>
+<h3>Token Bucket Rate Limiting</h3>
+<pre><code>   token যোগ হয় নির্দিষ্ট হারে (যেমন ১০/সে)
+            ↓
+      +-----------+
+      |  🪙🪙🪙🪙  |  ← bucket (সর্বোচ্চ ক্ষমতা)
+      +-----------+
+            ↓ প্রতিটি অনুরোধ ১ token নেয়
+   অনুরোধ → [token আছে?] → হ্যাঁ: অনুমোদিত
+                         → না: 429 প্রত্যাখ্যাত
+</code></pre>
+<h3>Resilience স্তর (অনুরোধ প্রবাহ)</h3>
+<div class="mermaid">graph LR
+    C[Client] --> RL[Rate Limiter<br/>429 যদি বেশি]
+    RL --> CB{Circuit Breaker}
+    CB -->|Closed| T[Timeout সহ কল]
+    CB -->|Open| F[Fallback উত্তর]
+    T --> S[Downstream Service]
+    T -.->|ব্যর্থ| R[Retry backoff+jitter]</div>
+<p><strong>ব্যাখ্যা:</strong> একটি অনুরোধ প্রথমে rate limiter পেরোয় (অতিরিক্ত হলে 429); তারপর circuit breaker — Closed হলে timeout সহ কল ও ব্যর্থতায় সীমিত retry; Open হলে সরাসরি fallback। স্তরে স্তরে সুরক্ষা।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>Retry with Exponential Backoff + Jitter (Python)</h3>
+<pre><code class="language-python">import time, random
+
+def call_with_retry(func, max_retries=4, base=1):
+    for attempt in range(max_retries):
+        try:
+            return func()                       # সফল হলে ফেরত
+        except TransientError as e:
+            if attempt == max_retries - 1:
+                raise                           # শেষ চেষ্টা ব্যর্থ
+            # exponential backoff + jitter
+            delay = base * (2 ** attempt) + random.uniform(0, 1)
+            time.sleep(delay)                   # ১+ → ২+ → ৪+ → ...
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> প্রতিবার ব্যর্থতায় অপেক্ষা দ্বিগুণ হয় (<code>2 ** attempt</code>), সাথে random <code>jitter</code> যোগ — যাতে বহু client একসাথে retry করে thundering herd না ঘটায়। শুধু <code>TransientError</code> (ক্ষণস্থায়ী) retry হয়; <code>max_retries</code> সীমা অসীম retry রোধ করে।</p>
+<h3>Circuit Breaker (সরলীকৃত Python)</h3>
+<pre><code class="language-python">import time
+
+class CircuitBreaker:
+    def __init__(self, threshold=5, timeout=30):
+        self.threshold = threshold     # কত ব্যর্থতায় Open
+        self.timeout = timeout         # Open থাকার সময়
+        self.failures = 0
+        self.state = &quot;CLOSED&quot;
+        self.opened_at = 0
+
+    def call(self, func):
+        if self.state == &quot;OPEN&quot;:
+            if time.time() - self.opened_at &gt; self.timeout:
+                self.state = &quot;HALF_OPEN&quot;     # পরীক্ষার সময়
+            else:
+                raise Exception(&quot;Circuit OPEN — fail fast&quot;)
+        try:
+            result = func()
+            self.failures = 0
+            self.state = &quot;CLOSED&quot;            # সফল → স্বাভাবিক
+            return result
+        except Exception:
+            self.failures += 1
+            if self.failures &gt;= self.threshold:
+                self.state = &quot;OPEN&quot;          # সীমা ছাড়াল → Open
+                self.opened_at = time.time()
+            raise
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> ব্যর্থতা <code>threshold</code> ছাড়ালে state <code>OPEN</code> হয় — তখন কল না করেই তৎক্ষণাৎ ব্যর্থ (fail fast)। <code>timeout</code> পেরোলে <code>HALF_OPEN</code>-এ একটি পরীক্ষা; সফল হলে <code>CLOSED</code> (পুনরুদ্ধার), ব্যর্থ হলে আবার <code>OPEN</code>।</p>
+<h3>Token Bucket Rate Limiter (Python)</h3>
+<pre><code class="language-python">import time
+
+class TokenBucket:
+    def __init__(self, capacity, refill_rate):
+        self.capacity = capacity        # সর্বোচ্চ token
+        self.tokens = capacity
+        self.refill_rate = refill_rate  # token/সেকেন্ড
+        self.last = time.time()
+
+    def allow(self):
+        now = time.time()
+        # সময় অনুযায়ী token পুনঃপূরণ
+        self.tokens = min(self.capacity,
+                          self.tokens + (now - self.last) * self.refill_rate)
+        self.last = now
+        if self.tokens &gt;= 1:
+            self.tokens -= 1
+            return True                  # অনুমোদিত
+        return False                     # 429 — সীমা ছাড়িয়েছে
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> সময়ের সাথে নির্দিষ্ট হারে (<code>refill_rate</code>) token যোগ হয়, সর্বোচ্চ <code>capacity</code> পর্যন্ত। প্রতিটি অনুরোধ একটি token নেয়; না থাকলে প্রত্যাখ্যাত। জমা token থাকায় সাময়িক <strong>burst</strong> সহ্য করা যায়। distributed setup-এ এই state Redis-এ রাখা হয়।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Netflix (Hystrix):</strong> circuit breaker, timeout, fallback ও bulkhead-এর জনপ্রিয় লাইব্রেরি Hystrix তৈরি করে — যা resilience প্যাটার্নকে মূলধারায় আনে; Chaos Engineering-এর সাথে মিলে তাদের সিস্টেম অত্যন্ত স্থিতিস্থাপক।</li>
+<li><strong>AWS / Google API:</strong> প্রায় সব পাবলিক API rate limiting করে; সীমা ছাড়ালে <code>429</code> এবং <code>Retry-After</code> header দেয়; ক্লায়েন্টদের exponential backoff সুপারিশ করে।</li>
+<li><strong>Stripe:</strong> তাদের API-তে শক্তিশালী rate limiting ও idempotency key ব্যবহার করে — retry নিরাপদ করতে।</li>
+<li><strong>GitHub / Twitter API:</strong> প্রতি-ব্যবহারকারী/টোকেন rate limit (যেমন প্রতি ঘণ্টায় X অনুরোধ) এবং অবশিষ্ট সীমা header-এ জানায়।</li>
+<li><strong>Cloudflare:</strong> edge-এ DDoS protection ও rate limiting দিয়ে origin রক্ষা করে (অধ্যায় ৬-এর সাথে সম্পর্কিত)।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- নেটওয়ার্ক কলে timeout সেট না করা — অসীম অপেক্ষা।<br />
+- jitter ছাড়া retry — সব client একসাথে retry করে thundering herd।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- non-idempotent অপারেশনে retry — duplicate প্রভাব (দুবার চার্জ)।<br />
+- 4xx ত্রুটিতেও retry করা — অর্থহীন, শুধু চাপ বাড়ায়।<br />
+- circuit breaker threshold ভুল টিউন করা (খুব সংবেদনশীল বা খুব নিষ্ক্রিয়)।</p>
+<p><strong>Production Mistakes:</strong><br />
+- <strong>Retry storm:</strong> একাধিক স্তরে retry (client retry + LB retry + সার্ভিস retry) মিলে অনুরোধ বহুগুণ — অসুস্থ সার্ভিসকে আরও ধসায়।<br />
+- distributed rate limiting-এ শেয়ারড স্টোর (Redis) ব্যবহার না করা — প্রতিটি সার্ভার আলাদা গণনা করে সীমা ভাঙে।<br />
+- fallback না থাকা — circuit Open হলে ব্যবহারকারী খালি ত্রুটি দেখে।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- bulkhead ছাড়া একটি ধীর নির্ভরতা সব thread খেয়ে ফেলা।<br />
+- rate limit গণনা প্রতিটি অনুরোধে DB-তে করা (Redis-এ atomic counter ভালো)।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- সব ব্যর্থতাকে একইভাবে ট্রিট করা — কোনটি retry-যোগ্য, কোনটি নয় তা আলাদা না করা।<br />
+- timeout মান চেইনে অসামঞ্জস্যপূর্ণ (ভেতরের timeout বাইরেরটির চেয়ে বড়) — অর্থহীন।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>Timeout কেন গুরুত্বপূর্ণ?</em></p>
+<blockquote>
+<p>timeout ছাড়া একটি ধীর/আটকে যাওয়া সার্ভিসের জন্য অনুরোধ অসীমকাল অপেক্ষা করে রিসোর্স (থ্রেড/connection) আটকে রাখে, যা cascading failure ঘটাতে পারে। timeout দ্রুত ব্যর্থ হয়ে রিসোর্স মুক্ত করে।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Retry-তে exponential backoff ও jitter কেন দরকার?</em></p>
+<blockquote>
+<p>Backoff প্রতিবার অপেক্ষা বাড়িয়ে ইতিমধ্যে চাপে থাকা সার্ভিসকে আরও চাপ দেওয়া রোধ করে। Jitter (random সময়) বহু client-কে একই মুহূর্তে retry করা থেকে বিরত রাখে — thundering herd এড়ায়।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Circuit Breaker-এর তিনটি অবস্থা ব্যাখ্যা করুন।</em></p>
+<blockquote>
+<p>Closed (স্বাভাবিক, ব্যর্থতা গণনা), Open (সীমা ছাড়ালে কল বন্ধ, fail fast), Half-Open (সময় পর সীমিত পরীক্ষা — সফলে Closed, ব্যর্থে Open)।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Rate Limiting আর Throttling-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>Rate limiting সাধারণত সীমা ছাড়ালে অনুরোধ প্রত্যাখ্যান করে (429); throttling প্রায়ই অনুরোধকে ধীর/বিলম্বিত করে বা মসৃণ করে (একেবারে বাতিল না করে)। দুটোরই লক্ষ্য প্রবাহ নিয়ন্ত্রণ ও সিস্টেম রক্ষা।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>একটি distributed সিস্টেমে rate limiting কীভাবে বাস্তবায়ন করবেন?</em></p>
+<blockquote>
+<p>একটি কেন্দ্রীয় শেয়ারড স্টোর (যেমন Redis)-এ atomic counter/token bucket রাখুন, যাতে সব সার্ভার একই সীমা ভাগ করে; নইলে প্রতিটি সার্ভার আলাদা গণনা করে কার্যকর সীমা বহুগুণ হয়ে যায়। Token Bucket burst সামলাতে, Sliding Window সঠিকতার জন্য। API Gateway স্তরে প্রয়োগ করুন।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি পাবলিক API ডিজাইন করুন যা অপব্যবহার থেকে সুরক্ষিত ও অভ্যন্তরীণ নির্ভরতার ব্যর্থতায় স্থিতিস্থাপক।</em></p>
+<blockquote>
+<p>Gateway স্তরে per-API-key <strong>rate limiting</strong> (Token Bucket, Redis-backed) ও <code>429 + Retry-After</code>। প্রতিটি ডাউনস্ট্রিম কলে <strong>timeout + সীমিত retry (backoff+jitter) + circuit breaker + fallback</strong>; <strong>bulkhead</strong> দিয়ে রিসোর্স পৃথকীকরণ; idempotency key দিয়ে retry নিরাপদ। monitoring দিয়ে circuit state ও limit hit ট্র্যাক।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>প্রতিটি দূরবর্তী কলে timeout সেট করুন</strong> — কখনো অসীম অপেক্ষা নয়।</li>
+<li><strong>Retry-তে exponential backoff + jitter + max limit</strong> ব্যবহার করুন; শুধু retry-যোগ্য (transient/5xx) ব্যর্থতায়।</li>
+<li><strong>Retry-এর আগে idempotency নিশ্চিত করুন</strong> (idempotency key)।</li>
+<li><strong>গুরুত্বপূর্ণ নির্ভরতায় circuit breaker + fallback</strong> রাখুন — fail fast ও graceful degradation।</li>
+<li><strong>Bulkhead দিয়ে রিসোর্স পৃথক করুন</strong> — একটি সার্ভিস সব thread না খায়।</li>
+<li><strong>পাবলিক/গুরুত্বপূর্ণ endpoint-এ rate limiting</strong> (API Gateway স্তরে); distributed হলে Redis-backed।</li>
+<li><strong>Retry storm এড়ান</strong> — একাধিক স্তরে অন্ধ retry নয়; সমন্বিত নীতি।</li>
+<li><strong>সব কিছু মনিটর করুন</strong> — timeout, retry count, circuit state, rate-limit hits।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Cascading Failure</strong> = একটি ব্যর্থতা শৃঙ্খলবদ্ধভাবে পুরো সিস্টেমকে ধসায়; resilience pattern এটি ভাঙে।<br />
+- <strong>Timeout</strong> = সর্বোচ্চ অপেক্ষা; রিসোর্স আটকা রোধ করে।<br />
+- <strong>Retry</strong> = ক্ষণস্থায়ী ব্যর্থতায় পুনঃচেষ্টা; <strong>exponential backoff + jitter + max + idempotency</strong> সহ।<br />
+- <strong>Circuit Breaker</strong> = Closed → Open → Half-Open; fail fast, cascading রোধ।<br />
+- <strong>Fallback</strong> (বিকল্প উত্তর) ও <strong>Bulkhead</strong> (রিসোর্স পৃথকীকরণ) সম্পর্কিত প্যাটার্ন।<br />
+- <strong>Rate Limiting</strong> = সীমা ছাড়ালে প্রত্যাখ্যান (429); অ্যালগরিদম — Token Bucket, Leaky Bucket, Fixed/Sliding Window।<br />
+- <strong>Throttling</strong> = অনুরোধ ধীর/বিলম্বিত করা; rate limiting-এর সাথে ঘনিষ্ঠ।<br />
+- distributed rate limiting-এ শেয়ারড স্টোর (Redis); সাধারণত API Gateway স্তরে।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> Cascading Failure, Timeout, Retry, Exponential Backoff, Jitter, Thundering Herd, Circuit Breaker (Closed/Open/Half-Open), Fail Fast, Fallback, Bulkhead, Deadline Propagation, Rate Limiting, Token Bucket, Leaky Bucket, Fixed/Sliding Window, Throttling, 429, Retry-After, Idempotency।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. Cascading failure কীভাবে ঘটে — একটি উদাহরণসহ ব্যাখ্যা করুন এবং কোন প্যাটার্ন এটি রোধ করে।<br />
+2. Rate Limiting ও Throttling-এর পার্থক্য নিজের ভাষায় লিখুন।</p>
+<p><strong>Practical:</strong><br />
+3. উপরের Token Bucket-কে Redis-backed (distributed) বানানোর কৌশল বর্ণনা করুন।<br />
+4. উপরের CircuitBreaker-এ Half-Open অবস্থায় শুধু সীমিত সংখ্যক পরীক্ষামূলক অনুরোধ অনুমোদনের লজিক যোগ করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি payment-নির্ভর checkout flow-এর জন্য সম্পূর্ণ resilience স্তর ডিজাইন করুন (timeout, retry, circuit breaker, fallback সহ)।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. একটি ধীর downstream সার্ভিসের কারণে আপনার retry "storm" তৈরি হচ্ছে যা সমস্যা আরও খারাপ করছে। কারণ ও সমাধান কী?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন idempotency ছাড়া retry বিপজ্জনক — একটি পেমেন্ট উদাহরণ দিয়ে।</p>
+<hr />
+<p><strong>অধ্যায় ১১ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

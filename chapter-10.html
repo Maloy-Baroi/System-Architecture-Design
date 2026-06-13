@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ১০: Load Balancer Deep Dive, Database Partitioning ও Sharding — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html" class="active"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ১০
+      </div>
+      <div class="page-nav">
+        <a href="chapter-9.html">← আগের অধ্যায়</a>
+        <a href="chapter-11.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ১০</div>
+      <h1>অধ্যায় ১০: Load Balancer Deep Dive, Database Partitioning ও Sharding</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>অধ্যায় ৯-এ আমরা শিখেছি horizontal scaling-এ আরও সার্ভার যোগ করা হয়। কিন্তু একটি গুরুত্বপূর্ণ প্রশ্ন থেকে যায় — কোটি কোটি অনুরোধ এই সার্ভারগুলোর মধ্যে কীভাবে ন্যায্যভাবে ভাগ হবে? এর উত্তর হলো <strong>Load Balancer</strong>, যা আমরা অধ্যায় ২-এ সংক্ষেপে দেখেছি। এই অধ্যায়ে আমরা এর গভীরে যাব — L4 vs L7, বিভিন্ন অ্যালগরিদম, consistent hashing, এবং Load Balancer নিজে কীভাবে নির্ভরযোগ্য থাকে।</p>
+<p>কিন্তু অ্যাপ সার্ভার scale করা সহজ অংশ। আসল চ্যালেঞ্জ হলো <strong>ডাটাবেস</strong>। আপনি ১০০০টি stateless সার্ভার বসাতে পারেন, কিন্তু যদি সবাই একটিই ডাটাবেসে আঘাত করে, সেই ডাটাবেসই bottleneck হয়ে যায়। ডাটা যখন এক মেশিনে আঁটে না বা এক মেশিন সব query সামলাতে পারে না, তখন ডাটাকে ভাগ করতে হয় — এটিই <strong>Partitioning</strong> ও <strong>Sharding</strong>।</p>
+<p>এই অধ্যায়টি internet-scale সিস্টেম ডিজাইনের মেরুদণ্ড, এবং System Design ইন্টারভিউয়ের সবচেয়ে গুরুত্বপূর্ণ অধ্যায়গুলোর একটি।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>L4 (Transport) vs L7 (Application)</strong> load balancing</li>
+<li>সব প্রধান <strong>load balancing অ্যালগরিদম</strong> (Round Robin থেকে Consistent Hashing)</li>
+<li><strong>Health Check</strong> (active/passive), <strong>SSL termination</strong>, <strong>reverse proxy</strong> ভূমিকা</li>
+<li>Load Balancer-এর <strong>High Availability</strong> (active-passive, active-active)</li>
+<li><strong>GSLB / DNS load balancing</strong> (global scale)</li>
+<li><strong>Partitioning</strong> কী — Vertical vs Horizontal</li>
+<li><strong>Sharding</strong> কী, এবং sharding কৌশল (Range, Hash, Consistent Hash, Directory)</li>
+<li><strong>Shard Key</strong> নির্বাচন ও চ্যালেঞ্জ (hotspot, rebalancing, cross-shard query)</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h2>অংশ ক: Load Balancer Deep Dive</h2>
+<h3>৩.১ Load Balancer পুনঃপরিচয়</h3>
+<p><strong>Load Balancer (LB)</strong> হলো একটি উপাদান যা আগত ট্র্যাফিক একাধিক backend সার্ভারে বণ্টন করে। এটি সাধারণত একটি <strong>reverse proxy</strong> হিসেবে কাজ করে — client সরাসরি সার্ভার চেনে না, শুধু LB-কে চেনে; LB পেছনে অনুরোধ রুট করে। এতে scaling, availability ও নিরাপত্তা সবই উন্নত হয়।</p>
+<h3>৩.২ L4 vs L7 Load Balancing</h3>
+<p>OSI মডেলের কোন স্তরে কাজ করে, তার ভিত্তিতে দুই ধরন:</p>
+<p><strong>L4 (Layer 4 — Transport Layer):</strong><br />
+TCP/UDP স্তরে কাজ করে; শুধু IP ঠিকানা ও পোর্ট দেখে রুট করে — অনুরোধের ভেতরের কনটেন্ট দেখে না।<br />
+- <em>সুবিধা:</em> অত্যন্ত দ্রুত ও কম overhead (প্যাকেট না খুলেই রুট)।<br />
+- <em>সীমা:</em> কনটেন্ট-ভিত্তিক বুদ্ধিমান রাউটিং করতে পারে না।<br />
+- <em>উদাহরণ:</em> AWS NLB (Network Load Balancer)।</p>
+<p><strong>L7 (Layer 7 — Application Layer):</strong><br />
+HTTP স্তরে কাজ করে; URL, header, cookie, content দেখে রুট করতে পারে — যেমন <code>/api/*</code> এক গ্রুপে, <code>/images/*</code> আরেক গ্রুপে।<br />
+- <em>সুবিধা:</em> বুদ্ধিমান, কনটেন্ট-ভিত্তিক রাউটিং; SSL termination; sticky session সহজ।<br />
+- <em>সীমা:</em> L4-এর চেয়ে ধীর (প্যাকেট খুলে পড়তে হয়)।<br />
+- <em>উদাহরণ:</em> AWS ALB (Application Load Balancer), NGINX, HAProxy।</p>
+<blockquote>
+<p><strong>সংক্ষেপে:</strong> কাঁচা গতি ও সরল রাউটিং → L4; বুদ্ধিমান, কনটেন্ট-সচেতন রাউটিং → L7 (আধুনিক ওয়েব অ্যাপে বেশি ব্যবহৃত)।</p>
+</blockquote>
+<h3>৩.৩ Load Balancing অ্যালগরিদম (বিস্তারিত)</h3>
+<ul>
+<li><strong>Round Robin:</strong> পালাক্রমে প্রতিটি সার্ভারে একটি করে। সরল, কিন্তু সার্ভারের ক্ষমতা/লোড বিবেচনা করে না।</li>
+<li><strong>Weighted Round Robin:</strong> শক্তিশালী সার্ভারকে বেশি ওজন (weight) দিয়ে বেশি অনুরোধ।</li>
+<li><strong>Least Connections:</strong> যে সার্ভারে এই মুহূর্তে সবচেয়ে কম সক্রিয় সংযোগ, সেখানে পাঠানো। দীর্ঘস্থায়ী সংযোগে ভালো।</li>
+<li><strong>Weighted Least Connections:</strong> least connections + সার্ভার ক্ষমতার ওজন।</li>
+<li><strong>Least Response Time:</strong> যে সার্ভার দ্রুততম উত্তর দিচ্ছে সেখানে — latency-সচেতন।</li>
+<li><strong>IP Hash:</strong> client IP-এর hash দিয়ে সার্ভার নির্ধারণ — একই client সবসময় একই সার্ভারে (sticky-র মতো)।</li>
+<li><strong>Random (with Two Choices):</strong> এলোমেলো দুটি সার্ভার বেছে কম-লোডেরটি নেওয়া — সরল অথচ কার্যকর।</li>
+<li><strong>Consistent Hashing:</strong> (নিচে বিস্তারিত) — সার্ভার যোগ/সরালে ন্যূনতম পুনর্বণ্টন।</li>
+</ul>
+<h3>৩.৪ Consistent Hashing (গুরুত্বপূর্ণ)</h3>
+<p>সাধারণ hashing-এ (<code>server = hash(key) % N</code>) সমস্যা: সার্ভার সংখ্যা <strong>N</strong> বদলালে (যোগ/সরানো) প্রায় <strong>সব</strong> key-এর mapping বদলে যায় — ফলে বিশাল পুনর্বণ্টন ও cache miss।</p>
+<p><strong>Consistent Hashing</strong> এই সমস্যা সমাধান করে: সার্ভার ও key উভয়কে একটি কাল্পনিক বৃত্তাকার "hash ring"-এ বসানো হয়; প্রতিটি key তার ঘড়ির কাঁটার দিকে নিকটতম সার্ভারে যায়। একটি সার্ভার যোগ/সরালে শুধু তার প্রতিবেশী অংশের key গুলো সরে — বাকি সব অপরিবর্তিত।<br />
+- <strong>Virtual Nodes (vnodes):</strong> প্রতিটি ভৌত সার্ভারকে ring-এ একাধিক ভার্চুয়াল বিন্দু হিসেবে রাখা হয় — যাতে লোড আরও সমানভাবে বণ্টিত হয়।<br />
+- <strong>ব্যবহার:</strong> distributed cache (যেমন Redis cluster, Memcached), distributed database (Cassandra, DynamoDB), এবং sharding।</p>
+<h3>৩.৫ Health Check (স্বাস্থ্য পরীক্ষা)</h3>
+<p>LB শুধু সুস্থ সার্ভারেই ট্র্যাফিক পাঠায়:<br />
+- <strong>Active Health Check:</strong> LB নিয়মিত সার্ভারকে ping/HTTP অনুরোধ পাঠায় (যেমন <code>/health</code>); ব্যর্থ হলে সরিয়ে রাখে।<br />
+- <strong>Passive Health Check:</strong> চলমান অনুরোধের ব্যর্থতা পর্যবেক্ষণ করে সিদ্ধান্ত নেওয়া।</p>
+<h3>৩.৬ অন্যান্য LB ভূমিকা</h3>
+<ul>
+<li><strong>SSL/TLS Termination:</strong> LB-তে এনক্রিপশন সামলানো হয় — backend সার্ভারের কাজ কমে।</li>
+<li><strong>Session Persistence (Sticky Session):</strong> একই client-কে একই সার্ভারে রাখা (stateful অ্যাপে; অধ্যায় ৯ দ্রষ্টব্য)।</li>
+<li><strong>Reverse Proxy ও নিরাপত্তা:</strong> backend লুকানো, DDoS শোষণ, rate limiting।</li>
+</ul>
+<h3>৩.৭ Load Balancer-এর High Availability</h3>
+<p>LB নিজেই Single Point of Failure হতে পারে — তাই LB-কেও redundant করতে হয়:<br />
+- <strong>Active-Passive:</strong> একটি সক্রিয় LB, একটি standby; সক্রিয়টি ব্যর্থ হলে standby দায়িত্ব নেয় (<strong>failover</strong>), প্রায়ই একটি <strong>floating/virtual IP</strong> দিয়ে।<br />
+- <strong>Active-Active:</strong> একাধিক LB একসাথে ট্র্যাফিক সামলায় — বেশি ক্ষমতা ও redundancy।</p>
+<h3>৩.৮ GSLB / DNS Load Balancing (Global Scale)</h3>
+<p>একটি অঞ্চলেই নয়, বিশ্বজুড়ে ট্র্যাফিক বণ্টনে:<br />
+- <strong>DNS-based Load Balancing:</strong> একটি ডোমেইনের জন্য DNS বিভিন্ন IP ফেরত দেয় (ভৌগোলিক/round-robin ভিত্তিতে) — ব্যবহারকারীকে নিকটতম/উপযুক্ত region-এ পাঠায়।<br />
+- <strong>GSLB (Global Server Load Balancing):</strong> একাধিক datacenter/region-এর মধ্যে latency, geography ও স্বাস্থ্য বিবেচনা করে রুট করে। (CDN-এর Anycast-এর সাথে সম্পর্কিত — অধ্যায় ৬)।</p>
+<hr />
+<h2>অংশ খ: Partitioning ও Sharding</h2>
+<h3>৩.৯ Partitioning কী?</h3>
+<p><strong>Partitioning</strong> হলো একটি বড় ডাটাবেস/টেবিলকে ছোট ছোট, আরও ব্যবস্থাপনাযোগ্য অংশে (partition) ভাগ করা — যাতে পারফরম্যান্স, scalability ও ব্যবস্থাপনা উন্নত হয়। দুই প্রধান ধরন:</p>
+<p><strong>Vertical Partitioning (উল্লম্ব বিভাজন):</strong><br />
+টেবিলকে <strong>কলাম</strong> অনুযায়ী ভাগ করা — কিছু কলাম এক জায়গায়, কিছু অন্য জায়গায়। যেমন <code>users</code> টেবিলের ঘন-ব্যবহৃত কলাম (id, name) এক partition-এ, বড়/কম-ব্যবহৃত কলাম (bio, profile_pic) আরেকটিতে।<br />
+- <em>সুবিধা:</em> ঘন-ব্যবহৃত ডাটা ছোট ও দ্রুত; সম্পর্কহীন ডাটা আলাদা।</p>
+<p><strong>Horizontal Partitioning (অনুভূমিক বিভাজন) = Sharding:</strong><br />
+টেবিলকে <strong>সারি (row)</strong> অনুযায়ী ভাগ করা — একই গঠন, কিন্তু ভিন্ন সারি ভিন্ন partition-এ। যেমন user 1–10 লক্ষ এক shard-এ, 10–20 লক্ষ আরেকটিতে। যখন এই partition গুলো <strong>ভিন্ন মেশিনে</strong> থাকে, তখন একে <strong>Sharding</strong> বলে।</p>
+<blockquote>
+<p><strong>Partitioning ≠ Replication:</strong> Partitioning ডাটাকে <strong>ভাগ</strong> করে (প্রতিটি অংশ ভিন্ন)। Replication ডাটার <strong>অনুলিপি</strong> রাখে (একই ডাটা একাধিক জায়গায়, redundancy ও read scaling-এর জন্য — অধ্যায় ১২/১৩)। বড় সিস্টেমে দুটোই একসাথে ব্যবহৃত হয়।</p>
+</blockquote>
+<h3>৩.১০ Sharding বিস্তারিত</h3>
+<p><strong>Sharding</strong> হলো horizontal partitioning যেখানে ডাটা একাধিক স্বাধীন ডাটাবেস সার্ভারে (shard) বিতরণ করা হয়। কোন সারি কোন shard-এ যাবে তা নির্ধারণ করে <strong>Shard Key (partition key)</strong>।</p>
+<p><strong>Sharding কৌশল:</strong></p>
+<ol>
+<li>
+<p><strong>Range-Based Sharding:</strong> key-এর পরিসর অনুযায়ী (যেমন A–M এক shard, N–Z আরেকটি; বা তারিখ অনুযায়ী)।<br />
+   - <em>সুবিধা:</em> range query সহজ; বাস্তবায়ন সরল।<br />
+   - <em>অসুবিধা:</em> অসম বণ্টন ও <strong>hotspot</strong> (যেমন সাম্প্রতিক তারিখে সব লেখা একটি shard-এ)।</p>
+</li>
+<li>
+<p><strong>Hash-Based Sharding:</strong> shard key-এর hash দিয়ে shard নির্ধারণ (<code>shard = hash(key) % N</code>)।<br />
+   - <em>সুবিধা:</em> সমান বণ্টন; hotspot কম।<br />
+   - <em>অসুবিধা:</em> range query কঠিন; shard সংখ্যা বদলালে বিশাল পুনর্বণ্টন (এজন্য consistent hashing)।</p>
+</li>
+<li>
+<p><strong>Consistent Hashing:</strong> (উপরে দেখুন) — shard যোগ/সরালে ন্যূনতম পুনর্বণ্টন। আধুনিক distributed DB-তে জনপ্রিয়।</p>
+</li>
+<li>
+<p><strong>Directory / Lookup-Based Sharding:</strong> একটি আলাদা lookup টেবিল রাখে কোন key কোন shard-এ আছে।<br />
+   - <em>সুবিধা:</em> সর্বোচ্চ নমনীয়তা; sharding scheme সহজে বদলানো যায়।<br />
+   - <em>অসুবিধা:</em> lookup টেবিল নিজে bottleneck ও single point of failure হতে পারে।</p>
+</li>
+<li>
+<p><strong>Geo-Based Sharding:</strong> ভৌগোলিক অবস্থান অনুযায়ী (ইউরোপের ডাটা ইউরোপের shard-এ) — latency ও আইনি (data residency) কারণে।</p>
+</li>
+</ol>
+<h3>৩.১১ Shard Key নির্বাচন ও চ্যালেঞ্জ</h3>
+<p><strong>ভালো Shard Key-এর গুণ:</strong> উচ্চ cardinality (অনেক ভিন্ন মান), সমান বণ্টন, এবং বেশিরভাগ query-তে উপস্থিত (যাতে cross-shard এড়ানো যায়)।</p>
+<p><strong>Sharding-এর প্রধান চ্যালেঞ্জ:</strong><br />
+- <strong>Hotspot / Celebrity Problem:</strong> এক shard-এ অসম লোড — যেমন একজন বিখ্যাত ব্যবহারকারীর (celebrity) সব ডাটা এক shard-এ, যা overload হয়।<br />
+- <strong>Resharding / Rebalancing:</strong> shard যোগ/সরানোর সময় ডাটা পুনর্বণ্টন — জটিল ও ঝুঁকিপূর্ণ (consistent hashing সাহায্য করে)।<br />
+- <strong>Cross-Shard Query / Join:</strong> একাধিক shard-জুড়ে query/join ব্যয়বহুল ও ধীর; প্রায়ই অ্যাপ্লিকেশন-স্তরে জোড়া লাগাতে হয়।<br />
+- <strong>Distributed Transactions:</strong> একাধিক shard জুড়ে ACID লেনদেন কঠিন (two-phase commit/SAGA — অধ্যায় ১৪/১৫)।<br />
+- <strong>জটিলতা ও অপারেশন:</strong> ব্যাকআপ, monitoring, schema পরিবর্তন সব shard-জুড়ে কঠিন।</p>
+<blockquote>
+<p><strong>নিয়ম:</strong> sharding একটি শেষ অস্ত্র — আগে vertical scaling, read replica, caching চেষ্টা করুন; ডাটা সত্যিই এক মেশিনে না আঁটলে তবেই shard করুন, কারণ এটি বিশাল জটিলতা যোগ করে।</p>
+</blockquote>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনার সোশ্যাল অ্যাপে ৫০ কোটি ব্যবহারকারী এবং একটি <code>posts</code> টেবিলে ১০০ কোটি পোস্ট। সমস্যা:</p>
+<ul>
+<li>একটি ডাটাবেস সার্ভারে এত ডাটা আঁটে না (স্টোরেজ সীমা)।</li>
+<li>এত write/read একটি মেশিন সামলাতে পারে না (throughput সীমা)।</li>
+<li>Index এত বড় যে query ধীর।</li>
+</ul>
+<p><strong>Vertical scaling / caching যথেষ্ট নয়</strong> — কারণ এটি মৌলিকভাবে আকারের সমস্যা।</p>
+<p><strong>সমাধান — Sharding:</strong><br />
+- <code>user_id</code>-কে shard key ধরে hash-based sharding: প্রতিটি ব্যবহারকারীর পোস্ট তার <code>hash(user_id)</code> অনুযায়ী shard-এ যায়।<br />
+- ১০টি shard হলে প্রতিটিতে ~১০ কোটি পোস্ট — যা ব্যবস্থাপনাযোগ্য।<br />
+- ট্র্যাফিক ১০টি মেশিনে ভাগ হয়ে throughput ১০ গুণ।<br />
+- সামনে একটি Load Balancer অ্যাপ সার্ভার scale করে; প্রতিটি অ্যাপ সার্ভার shard key দেখে সঠিক shard-এ যায়।</p>
+<p>কিন্তু সাবধানতা — "একজন celebrity-র টাইমলাইন" বা "সব shard জুড়ে সার্চ" এখন কঠিন। এই ট্রেড-অফগুলো জেনেই sharding করতে হয়। Instagram, Twitter ঠিক এভাবেই scale করেছে।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>Consistent Hashing Ring</h3>
+<pre><code>            [Server A]
+           /           \
+     key3 •             • key1
+         /               \
+   [Server C]          [Server B]
+         \               /
+     key2 •             • key4
+           \           /
+         (ঘড়ির কাঁটার দিকে নিকটতম server-এ key যায়;
+          server যোগ/সরালে শুধু প্রতিবেশী key সরে)
+</code></pre>
+<h3>Mermaid: Sharded ডাটাবেস আর্কিটেকচার</h3>
+<div class="mermaid">graph TD
+    C[Client] --> LB[Load Balancer L7]
+    LB --> A1[App Server 1]
+    LB --> A2[App Server 2]
+    A1 --> R{Shard Router<br/>hash user_id}
+    A2 --> R
+    R -->|shard 0| S0[(DB Shard 0<br/>users 0-N)]
+    R -->|shard 1| S1[(DB Shard 1<br/>users N-2N)]
+    R -->|shard 2| S2[(DB Shard 2<br/>users 2N-3N)]</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong><br />
+- <strong>Components:</strong> Load Balancer (অ্যাপ স্তর scale), একাধিক stateless App Server, একটি Shard Router, ও একাধিক DB shard।<br />
+- <strong>Flow:</strong> LB অনুরোধ অ্যাপ সার্ভারে দেয় → অ্যাপ shard key (user_id) hash করে সঠিক shard নির্ধারণ করে → সেই shard-এ query।<br />
+- <strong>Failure Points:</strong> একটি shard ডাউন হলে শুধু সেই অংশের ডাটা প্রভাবিত (সবটা নয়) — তবে সেই অংশ অনুপলব্ধ; তাই প্রতিটি shard-ও replicated রাখা হয়।<br />
+- <strong>Scaling:</strong> নতুn shard যোগ করে আরও ডাটা/ট্র্যাফিক; consistent hashing ব্যবহারে পুনর্বণ্টন ন্যূনতম।</p>
+<h3>Load Balancer High Availability</h3>
+<div class="mermaid">graph TD
+    C[Clients] --> VIP[Virtual IP]
+    VIP --> LB1[LB Active]
+    VIP -.->|failover| LB2[LB Standby]
+    LB1 --> S1[Server 1]
+    LB1 --> S2[Server 2]</div>
+<p><strong>ব্যাখ্যা:</strong> একটি floating Virtual IP সক্রিয় LB-কে নির্দেশ করে; সক্রিয়টি ব্যর্থ হলে VIP standby LB-তে সরে যায় (failover) — তাই LB নিজে single point of failure হয় না।</p>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>Consistent Hashing (Python — সরলীকৃত)</h3>
+<pre><code class="language-python">import hashlib, bisect
+
+class ConsistentHash:
+    def __init__(self, servers, vnodes=100):
+        self.ring = {}                 # hash → server
+        self.sorted_keys = []
+        for s in servers:
+            for i in range(vnodes):    # virtual nodes — সমান বণ্টন
+                h = self._hash(f&quot;{s}:{i}&quot;)
+                self.ring[h] = s
+                bisect.insort(self.sorted_keys, h)
+
+    def _hash(self, key):
+        return int(hashlib.md5(key.encode()).hexdigest(), 16)
+
+    def get_server(self, key):
+        h = self._hash(key)
+        # ঘড়ির কাঁটার দিকে নিকটতম server
+        idx = bisect.bisect(self.sorted_keys, h) % len(self.sorted_keys)
+        return self.ring[self.sorted_keys[idx]]
+
+ch = ConsistentHash([&quot;shard0&quot;, &quot;shard1&quot;, &quot;shard2&quot;])
+print(ch.get_server(&quot;user_42&quot;))   # সবসময় একই shard দেবে
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> প্রতিটি server-কে <code>vnodes</code> সংখ্যক ভার্চুয়াল বিন্দু হিসেবে ring-এ বসানো হয় (সমান বণ্টনের জন্য)। <code>get_server</code> একটি key-এর hash থেকে ঘড়ির কাঁটার দিকে নিকটতম server খুঁজে দেয় (<code>bisect</code> দিয়ে দ্রুত)। একটি server সরালে শুধু তার অংশের key পুনর্বণ্টিত হয় — বাকি সব অপরিবর্তিত।</p>
+<h3>NGINX Load Balancer কনফিগ (L7)</h3>
+<pre><code class="language-nginx">upstream backend {
+    least_conn;                       # least connections অ্যালগরিদম
+    server app1.example.com weight=3; # শক্তিশালী সার্ভার, বেশি weight
+    server app2.example.com;
+    server app3.example.com;
+}
+
+server {
+    listen 443 ssl;                   # SSL termination এখানে
+    location /api/ {                  # L7: path-ভিত্তিক রাউটিং
+        proxy_pass http://backend;
+        health_check;                 # active health check
+    }
+}
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> NGINX একটি L7 reverse proxy/load balancer হিসেবে কাজ করছে — <code>least_conn</code> অ্যালগরিদম, <code>weight</code> দিয়ে অসম ক্ষমতা সামলানো, <code>/api/</code> path-ভিত্তিক রাউটিং (L7-এর সুবিধা), SSL এখানেই terminate, এবং active <code>health_check</code>।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Instagram:</strong> PostgreSQL-এ <code>user_id</code>-ভিত্তিক sharding ব্যবহার করে বিলিয়ন রেকর্ড সামলায়; logical shard-কে physical সার্ভারে ম্যাপ করার একটি চতুর কৌশল ব্যবহার করে (সহজ rebalancing-এর জন্য)।</li>
+<li><strong>Amazon DynamoDB &amp; Cassandra:</strong> consistent hashing-এর ওপর ভিত্তি করে গড়া — node যোগ/সরালে মসৃণ পুনর্বণ্টন।</li>
+<li><strong>Google (Maglev) ও Netflix:</strong> নিজস্ব বিশাল-স্কেল software load balancer ব্যবহার করে কোটি কোটি সংযোগ বণ্টন করতে।</li>
+<li><strong>Discord:</strong> Cassandra-তে message sharding করে ট্রিলিয়ন মেসেজ সামলায়; hotspot ও large-partition সমস্যা সমাধানের কেস স্টাডি বিখ্যাত।</li>
+<li><strong>Cloudflare/AWS:</strong> GSLB ও Anycast দিয়ে বিশ্বজুড়ে নিকটতম datacenter-এ ট্র্যাফিক রুট করে।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- Load Balancer-কে single point of failure রেখে দেওয়া (redundant না করা)।<br />
+- ভুল ভেবে নেওয়া যে sharding শুধু "আরও মেশিন" — এর বিশাল জটিলতা উপেক্ষা করা।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- খারাপ shard key বাছা (কম cardinality বা অসম বণ্টন) → hotspot।<br />
+- সাধারণ <code>hash % N</code> ব্যবহার, যা shard যোগে বিশাল পুনর্বণ্টন ঘটায় (consistent hashing দরকার)।</p>
+<p><strong>Production Mistakes:</strong><br />
+- <strong>Celebrity/hotspot সমস্যা</strong> পরিকল্পনা না করা — এক shard overload।<br />
+- cross-shard query/join-এর খরচ আগে থেকে বিবেচনা না করা।<br />
+- প্রতিটি shard আলাদাভাবে replicate না করা — shard ডাউন মানে ঐ ডাটা পুরোপুরি অনুপলব্ধ।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- প্রয়োজনের আগেই sharding (premature) — যখন caching/replica যথেষ্ট ছিল।<br />
+- resharding কৌশল ছাড়াই shard করা — পরে বাড়াতে গিয়ে আটকে যাওয়া।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- L4 ব্যবহার যেখানে content-ভিত্তিক রাউটিং (L7) দরকার ছিল, বা উল্টোটা।<br />
+- partitioning ও replication গুলিয়ে ফেলা — দুটি ভিন্ন উদ্দেশ্যের কৌশল।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>L4 আর L7 load balancer-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>L4 transport স্তরে (IP/পোর্ট) কাজ করে — দ্রুত কিন্তু কনটেন্ট দেখে না। L7 application স্তরে (HTTP, URL, header) কাজ করে — বুদ্ধিমান কনটেন্ট-ভিত্তিক রাউটিং ও SSL termination দিতে পারে, তবে ধীর।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Consistent Hashing কেন দরকার?</em></p>
+<blockquote>
+<p>সাধারণ <code>hash % N</code>-এ সার্ভার সংখ্যা বদলালে প্রায় সব key পুনর্বণ্টিত হয় (বিশাল cache miss/ডাটা সরানো)। Consistent hashing-এ সার্ভার যোগ/সরালে শুধু প্রতিবেশী অংশের key সরে — পুনর্বণ্টন ন্যূনতম।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>Vertical আর Horizontal partitioning-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>Vertical — টেবিলকে কলাম অনুযায়ী ভাগ (কিছু কলাম এক জায়গায়)। Horizontal (sharding) — সারি অনুযায়ী ভাগ (ভিন্ন সারি ভিন্ন মেশিনে)।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>Sharding-এ "celebrity/hotspot" সমস্যা কী এবং কীভাবে সামলাবেন?</em></p>
+<blockquote>
+<p>একটি shard-এ অসম লোড — যেমন একজন বিখ্যাত ব্যবহারকারীর বিপুল ট্র্যাফিক এক shard-এ পড়ে সেটি overload করে। সমাধান: ভালো shard key (উচ্চ cardinality), hot key-কে আলাদা/একাধিক shard-এ ছড়ানো, ঐ ডাটা caching, বা celebrity-দের জন্য আলাদা ব্যবস্থা।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি বিশ্বব্যাপী চ্যাট অ্যাপের ডাটাবেস স্তর ডিজাইন করুন (ট্রিলিয়ন মেসেজ)।</em></p>
+<blockquote>
+<p>মেসেজ <code>channel_id</code> বা <code>chat_id</code>-ভিত্তিক sharding (একই চ্যাটের মেসেজ একসাথে); consistent hashing দিয়ে shard বণ্টন ও সহজ rebalancing; প্রতিটি shard replicated (HA); সামনে L7 load balancer + stateless সার্ভার; cross-shard query এড়াতে query প্যাটার্ন অনুযায়ী shard key বাছা; hot channel-এর জন্য caching। বিশ্বব্যাপী latency-তে GSLB/geo-sharding বিবেচনা।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>Load Balancer-কে redundant করুন</strong> (active-passive/active-active) — single point of failure এড়াতে।</li>
+<li><strong>L7 ব্যবহার করুন</strong> আধুনিক ওয়েব অ্যাপে (content-ভিত্তিক রাউটিং, SSL termination); কাঁচা গতিতে L4।</li>
+<li><strong>distributed cache/sharding-এ consistent hashing</strong> ব্যবহার করুন।</li>
+<li><strong>Sharding-এর আগে caching, read replica, vertical scaling চেষ্টা করুন</strong> — sharding শেষ অস্ত্র।</li>
+<li><strong>ভালো shard key বাছুন</strong> — উচ্চ cardinality, সমান বণ্টন, query-বান্ধব।</li>
+<li><strong>প্রতিটি shard আলাদাভাবে replicate করুন</strong> — HA নিশ্চিত করতে।</li>
+<li><strong>hotspot ও resharding আগে থেকে পরিকল্পনা করুন</strong>; query প্যাটার্ন বুঝে shard key স্থির করুন।</li>
+<li><strong>partitioning ও replication আলাদা করে ভাবুন</strong> — একটি ভাগ করে, অন্যটি অনুলিপি রাখে।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Load Balancer</strong> = reverse proxy যা ট্র্যাফিক বণ্টন করে; <strong>L4</strong> (দ্রুত, IP/পোর্ট) vs <strong>L7</strong> (বুদ্ধিমান, HTTP)।<br />
+- <strong>অ্যালগরিদম:</strong> Round Robin, Weighted, Least Connections, Least Response Time, IP Hash, Consistent Hashing।<br />
+- <strong>Consistent Hashing</strong> = সার্ভার যোগ/সরালে ন্যূনতম পুনর্বণ্টন; virtual nodes দিয়ে সমান বণ্টন।<br />
+- <strong>Health Check</strong> (active/passive), <strong>SSL termination</strong>, <strong>HA</strong> (active-passive/active-active), <strong>GSLB</strong> (global)।<br />
+- <strong>Partitioning</strong> = ডাটা ভাগ করা; <strong>Vertical</strong> (কলাম) vs <strong>Horizontal/Sharding</strong> (সারি)।<br />
+- <strong>Sharding কৌশল:</strong> Range, Hash, Consistent Hash, Directory, Geo।<br />
+- <strong>চ্যালেঞ্জ:</strong> hotspot/celebrity, resharding, cross-shard query, distributed transaction।<br />
+- <strong>Partitioning ≠ Replication</strong> — ভাগ vs অনুলিপি।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> L4/L7, Reverse Proxy, Round Robin, Least Connections, IP Hash, Consistent Hashing, Virtual Nodes, Health Check, SSL Termination, Active-Passive/Active-Active, Floating IP, GSLB, Partitioning (Vertical/Horizontal), Sharding, Shard Key, Range/Hash/Directory Sharding, Hotspot, Resharding, Cross-Shard Query।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. L4 ও L7 load balancing-এর পার্থক্য ও কখন কোনটি — ব্যাখ্যা করুন।<br />
+2. কেন consistent hashing সাধারণ <code>hash % N</code>-এর চেয়ে scaling-এ ভালো?</p>
+<p><strong>Practical:</strong><br />
+3. উপরের ConsistentHash ক্লাসে একটি <code>add_server</code>/<code>remove_server</code> মেথড যোগ করুন।<br />
+4. একটি <code>orders</code> টেবিলের জন্য একটি ভালো shard key প্রস্তাব করুন এবং কেন — ব্যাখ্যা করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি e-commerce সিস্টেমের জন্য সম্পূর্ণ load balancing + database sharding আর্কিটেকচার ডিজাইন করুন (HA সহ)।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার sharded সিস্টেমে একটি shard-এ CPU সবসময় ৯০%+, বাকিগুলো ২০%। সমস্যা কী এবং কীভাবে সমাধান করবেন?</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন sharding একটি "শেষ অস্ত্র" এবং কোন কোন কম-জটিল বিকল্প আগে চেষ্টা করা উচিত।</p>
+<hr />
+<p><strong>অধ্যায় ১০ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>

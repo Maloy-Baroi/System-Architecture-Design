@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>অধ্যায় ৩: Client-Server Model, 3-Tier Architecture, HTTP ও REST API — সিস্টেম আর্কিটেকচার</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 300px;
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --active-bg: #1e293b;
+  --active-text: #c7d2fe;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --body-bg: #f8fafc;
+  --content-bg: #ffffff;
+  --text-dark: #1e293b;
+  --text-body: #374151;
+  --border: #e2e8f0;
+  --code-bg: #0f172a;
+  --blockquote-bg: #eff6ff;
+  --blockquote-border: #6366f1;
+  --table-header: #f1f5f9;
+  --tag-bg: #e0e7ff;
+  --tag-text: #3730a3;
+  --h1-color: #1e293b;
+  --h2-color: #312e81;
+  --h3-color: #4338ca;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--body-bg);
+  color: var(--text-body);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+.sidebar-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: sticky;
+  top: 0;
+  background: var(--sidebar-bg);
+  z-index: 10;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #f1f5f9;
+}
+.brand-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1.3; }
+.brand-text .title { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; }
+.brand-text .subtitle { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.sidebar-nav { padding: 12px 0 24px; }
+.nav-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px 6px;
+}
+
+.chapter-list { list-style: none; }
+.chapter-list li a {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 20px;
+  text-decoration: none;
+  color: var(--text-light);
+  border-left: 3px solid transparent;
+  transition: all .18s ease;
+  gap: 2px;
+}
+.chapter-list li a:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-left-color: #4338ca;
+}
+.chapter-list li a.active {
+  background: var(--active-bg);
+  color: var(--active-text);
+  border-left-color: var(--accent);
+}
+.chapter-list li a .ch-num {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.chapter-list li a.active .ch-num { color: var(--accent-hover); }
+.chapter-list li a .ch-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--sidebar-border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  padding: 0 0 60px;
+}
+
+/* ── Home Page ── */
+.home-page { padding: 48px; max-width: 900px; }
+.home-hero {
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e1b4b 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 48px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -10%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.home-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+}
+.home-hero h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: white;
+  border: none;
+  padding: 0;
+}
+.home-hero p { font-size: 1.05rem; opacity: .85; max-width: 500px; line-height: 1.7; }
+.home-hero .stats {
+  display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap;
+}
+.home-hero .stat { text-align: center; }
+.home-hero .stat .num { font-size: 2rem; font-weight: 800; }
+.home-hero .stat .lbl { font-size: 0.78rem; opacity: .7; margin-top: 2px; }
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.chapter-card {
+  background: var(--content-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  display: block;
+  transition: all .2s ease;
+  box-shadow: var(--shadow);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(99,102,241,.15);
+}
+.chapter-card .card-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.chapter-card .card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
+
+/* ── Article / Blog Post ── */
+.article-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
+  padding: 48px;
+}
+.article-header .chapter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.article-header h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: white;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.article-body { padding: 48px; max-width: 820px; }
+
+/* ── Typography ── */
+.article-body h1, .article-body h2, .article-body h3,
+.article-body h4, .article-body h5 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: .6em;
+}
+.article-body h1 { font-size: 1.8rem; color: var(--h1-color); padding-bottom: .4em; border-bottom: 2px solid #e0e7ff; }
+.article-body h2 { font-size: 1.35rem; color: var(--h2-color); padding-left: 12px; border-left: 4px solid var(--accent); }
+.article-body h3 { font-size: 1.1rem; color: var(--h3-color); }
+.article-body h4 { font-size: 1rem; color: var(--text-dark); }
+
+.article-body p { margin-bottom: 1.1em; color: var(--text-body); }
+
+.article-body ul, .article-body ol {
+  margin: 0 0 1.1em 1.5em;
+}
+.article-body li { margin-bottom: .35em; }
+.article-body li > ul, .article-body li > ol { margin-top: .35em; margin-bottom: .35em; }
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
+
+.article-body blockquote {
+  background: var(--blockquote-bg);
+  border-left: 4px solid var(--blockquote-border);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 1.5em 0;
+  color: #1e40af;
+  font-style: normal;
+}
+.article-body blockquote p { margin-bottom: 0; color: #1e40af; }
+
+/* ── Code ── */
+.article-body code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: .875em;
+  background: #f1f5f9;
+  color: #be185d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.article-body pre {
+  background: var(--code-bg);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+.article-body pre code {
+  background: none;
+  color: #e2e8f0;
+  border: none;
+  padding: 0;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+/* ── Tables ── */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: .9rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.article-body th {
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: .83rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.article-body td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.article-body tr:nth-child(even) td { background: #f8fafc; }
+.article-body tr:last-child td { border-bottom: none; }
+.article-body tr:hover td { background: #eff6ff; }
+
+/* ── Mermaid ── */
+.mermaid {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin: 1.5em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+/* ── Strong / Em ── */
+.article-body strong { color: var(--text-dark); font-weight: 700; }
+
+/* ── Nav Top Bar ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 48px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.top-bar .breadcrumb {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-bar .breadcrumb a { color: var(--accent); text-decoration: none; }
+.top-bar .breadcrumb a:hover { text-decoration: underline; }
+.top-bar .breadcrumb .sep { color: var(--text-muted); }
+.top-bar .page-nav { display: flex; gap: 8px; }
+.top-bar .page-nav a {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all .15s;
+}
+.top-bar .page-nav a:hover { background: #eff6ff; border-color: var(--accent); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-300px); width: 300px; }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .article-header, .article-body, .home-page { padding: 24px; }
+  .home-hero { padding: 28px; }
+  .home-hero h1 { font-size: 1.5rem; }
+  .top-bar { padding: 12px 24px; }
+  .menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    border: none;
+  }
+}
+.menu-btn { display: none; }
+
+/* Scrollbar for main */
+.main-content { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <div class="brand-icon">📚</div>
+        <div class="brand-text">
+          <div class="title">সিস্টেম আর্কিটেকচার</div>
+          <div class="subtitle">System Design Bangla Book</div>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">অধ্যায়সমূহ</div>
+      <ul class="chapter-list">
+        <li><a href="index.html"><span class="ch-num">🏠 হোম</span><span class="ch-title">বইয়ের পরিচয় ও অধ্যায় তালিকা</span></a></li>
+          <li><a href="chapter-1.html"><span class="ch-num">অধ্যায় ১</span><span class="ch-title">সিস্টেম ডিজাইনের ভিত্তি</span></a></li>
+          <li><a href="chapter-2.html"><span class="ch-num">অধ্যায় ২</span><span class="ch-title">সিস্টেমের গুণাগুণ</span></a></li>
+          <li><a href="chapter-3.html" class="active"><span class="ch-num">অধ্যায় ৩</span><span class="ch-title">Client-Server Model, HTTP ও REST API</span></a></li>
+          <li><a href="chapter-4.html"><span class="ch-num">অধ্যায় ৪</span><span class="ch-title">RDBMS vs NoSQL ও Query Optimization</span></a></li>
+          <li><a href="chapter-5.html"><span class="ch-num">অধ্যায় ৫</span><span class="ch-title">Caching, Redis ও Cache Invalidation</span></a></li>
+          <li><a href="chapter-6.html"><span class="ch-num">অধ্যায় ৬</span><span class="ch-title">CDN এবং Object, Block ও File Storage</span></a></li>
+          <li><a href="chapter-7.html"><span class="ch-num">অধ্যায় ৭</span><span class="ch-title">REST vs gRPC vs WebSockets</span></a></li>
+          <li><a href="chapter-8.html"><span class="ch-num">অধ্যায় ৮</span><span class="ch-title">Message Queues ও Kafka</span></a></li>
+          <li><a href="chapter-9.html"><span class="ch-num">অধ্যায় ৯</span><span class="ch-title">Horizontal vs Vertical Scaling</span></a></li>
+          <li><a href="chapter-10.html"><span class="ch-num">অধ্যায় ১০</span><span class="ch-title">Load Balancer Deep Dive ও Sharding</span></a></li>
+          <li><a href="chapter-11.html"><span class="ch-num">অধ্যায় ১১</span><span class="ch-title">Circuit Breakers ও Rate Limiting</span></a></li>
+          <li><a href="chapter-12.html"><span class="ch-num">অধ্যায় ১২</span><span class="ch-title">Redundancy, Failover ও Health Checks</span></a></li>
+          <li><a href="chapter-13.html"><span class="ch-num">অধ্যায় ১৩</span><span class="ch-title">CAP Theorem ও Consistency Models</span></a></li>
+          <li><a href="chapter-14.html"><span class="ch-num">অধ্যায় ১৪</span><span class="ch-title">Clock Skew, Idempotency ও 2PC</span></a></li>
+          <li><a href="chapter-15.html"><span class="ch-num">অধ্যায় ১৫</span><span class="ch-title">Service Discovery, API Gateway ও CQRS</span></a></li>
+          <li><a href="chapter-16.html"><span class="ch-num">অধ্যায় ১৬</span><span class="ch-title">Event Sourcing ও Service Mesh</span></a></li>
+          <li><a href="chapter-17.html"><span class="ch-num">অধ্যায় ১৭</span><span class="ch-title">কেস স্টাডি: WhatsApp, Instagram ও Twitter</span></a></li>
+          <li><a href="chapter-18.html"><span class="ch-num">অধ্যায় ১৮</span><span class="ch-title">AWS Fundamentals ও Core AWS Services</span></a></li>
+          <li><a href="chapter-19.html"><span class="ch-num">অধ্যায় ১৯</span><span class="ch-title">কেস স্টাডি: Dropbox, YouTube ও Netflix</span></a></li>
+          <li><a href="chapter-20.html"><span class="ch-num">অধ্যায় ২০</span><span class="ch-title">Scaling to Millions ও AWS Auto Scaling</span></a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">© 2025 সিস্টেম আর্কিটেকচার</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <a href="index.html">হোম</a>
+        <span class="sep">›</span>অধ্যায় ৩
+      </div>
+      <div class="page-nav">
+        <a href="chapter-2.html">← আগের অধ্যায়</a>
+        <a href="chapter-4.html">পরের অধ্যায় →</a>
+      </div>
+    </div>
+    
+    <div class="article-header">
+      <div class="chapter-tag">📖 অধ্যায় ৩</div>
+      <h1>অধ্যায় ৩: Client-Server Model, 3-Tier Architecture, HTTP ও REST API</h1>
+    </div>
+    <div class="article-body">
+      <hr />
+<h2>১. অধ্যায় পরিচিতি (Chapter Introduction)</h2>
+<p>আগের অধ্যায়ে আমরা সিস্টেমের গুণাগুণ (scalability, latency ইত্যাদি) শিখেছি। কিন্তু একটি সিস্টেম আসলে কীভাবে যোগাযোগ করে? আপনি যখন ব্রাউজারে একটি ওয়েবসাইট খোলেন, তখন আপনার কম্পিউটার আর দূরের সার্ভারের মধ্যে ঠিক কী ঘটে?</p>
+<p>এই অধ্যায়ে আমরা ইন্টারনেটের সবচেয়ে মৌলিক যোগাযোগ মডেল — <strong>Client-Server Model (ক্লায়েন্ট-সার্ভার মডেল)</strong> শিখব। এরপর দেখব কীভাবে বড় অ্যাপ্লিকেশনকে স্তরে স্তরে সাজানো হয় (<strong>3-Tier Architecture</strong>)। তারপর শিখব ওয়েবের ভাষা <strong>HTTP</strong>, এবং সবশেষে আধুনিক API ডিজাইনের মান <strong>REST</strong>।</p>
+<p>এগুলো এমন ভিত্তি, যা ছাড়া পরবর্তী অধ্যায়ের কোনো উন্নত ধারণা (microservices, API Gateway, caching) বোঝা সম্ভব নয়।</p>
+<hr />
+<h2>২. শেখার লক্ষ্য (Learning Objectives)</h2>
+<p>এই অধ্যায় শেষে আপনি বুঝতে পারবেন:</p>
+<ul>
+<li><strong>Client-Server Model</strong> কীভাবে কাজ করে এবং কেন এটি ইন্টারনেটের ভিত্তি</li>
+<li><strong>3-Tier Architecture</strong>-এর তিনটি স্তর এবং তাদের দায়িত্ব</li>
+<li><strong>HTTP</strong> কী, এর Request/Response গঠন, Method ও Status Code</li>
+<li><strong>REST</strong> কী এবং একটি ভালো <strong>REST API Endpoint</strong> কীভাবে ডিজাইন করতে হয়</li>
+<li><strong>Stateless</strong> যোগাযোগ কেন গুরুত্বপূর্ণ</li>
+</ul>
+<hr />
+<h2>৩. মূল ধারণা (Core Concepts)</h2>
+<h3>৩.১ Client-Server Model (ক্লায়েন্ট-সার্ভার মডেল)</h3>
+<p>এটি একটি যোগাযোগ মডেল যেখানে দুটি পক্ষ থাকে:</p>
+<ul>
+<li><strong>Client (ক্লায়েন্ট):</strong> যে অনুরোধ (request) পাঠায় — যেমন আপনার ব্রাউজার, মোবাইল অ্যাপ।</li>
+<li><strong>Server (সার্ভার):</strong> যে অনুরোধ গ্রহণ করে, প্রক্রিয়া করে এবং উত্তর (response) ফেরত দেয়।</li>
+</ul>
+<p><strong>মৌলিক প্রবাহ:</strong> Client একটি অনুরোধ পাঠায় → Server সেটি প্রক্রিয়া করে (ডাটাবেস থেকে তথ্য আনে) → Server উত্তর ফেরত পাঠায়।</p>
+<p>এই মডেলের মূল বৈশিষ্ট্য হলো <strong>দায়িত্ব বিভাজন</strong> — Client শুধু চায়, Server দেয়। একটি Server একসাথে হাজারো Client-কে সেবা দিতে পারে।</p>
+<h3>৩.২ 3-Tier Architecture (থ্রি-টিয়ার আর্কিটেকচার)</h3>
+<p>বড় অ্যাপ্লিকেশনকে তিনটি যৌক্তিক স্তরে (tier/layer) ভাগ করা হয়, যাতে প্রতিটি স্তর স্বাধীনভাবে পরিবর্তন ও scale করা যায়।</p>
+<ol>
+<li><strong>Presentation Tier (উপস্থাপন স্তর):</strong> ব্যবহারকারী যা দেখে — UI, ওয়েব পেজ, মোবাইল স্ক্রিন। (Frontend)</li>
+<li><strong>Application/Logic Tier (যুক্তি স্তর):</strong> ব্যবসায়িক যুক্তি (business logic) — হিসাব, নিয়ম, প্রক্রিয়াকরণ। (Backend)</li>
+<li><strong>Data Tier (ডাটা স্তর):</strong> তথ্য সংরক্ষণ — Database, file storage।</li>
+</ol>
+<blockquote>
+<p><strong>সুবিধা:</strong> একটি স্তরে পরিবর্তন আনলে অন্য স্তরে প্রভাব পড়ে না। যেমন UI বদলালেও ডাটাবেস স্পর্শ করতে হয় না। প্রতিটি স্তর আলাদাভাবে scale করা যায়।</p>
+</blockquote>
+<h3>৩.৩ HTTP Basics (এইচটিটিপি)</h3>
+<p><strong>HTTP (HyperText Transfer Protocol)</strong> হলো সেই প্রোটোকল যার মাধ্যমে Client ও Server ওয়েবে কথা বলে। এটি একটি <strong>request-response</strong> প্রোটোকল এবং <strong>stateless</strong> — অর্থাৎ প্রতিটি অনুরোধ স্বাধীন, Server আগের অনুরোধ মনে রাখে না।</p>
+<p><strong>HTTP Methods (গুরুত্বপূর্ণ):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>কাজ</th>
+<th>উদাহরণ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td>তথ্য পড়া (read)</td>
+<td>ব্যবহারকারীর প্রোফাইল আনা</td>
+</tr>
+<tr>
+<td>POST</td>
+<td>নতুন তথ্য তৈরি (create)</td>
+<td>নতুন অ্যাকাউন্ট খোলা</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td>সম্পূর্ণ আপডেট (replace)</td>
+<td>পুরো প্রোফাইল বদলানো</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td>আংশিক আপডেট</td>
+<td>শুধু ইমেইল বদলানো</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td>মুছে ফেলা</td>
+<td>অ্যাকাউন্ট মুছে ফেলা</td>
+</tr>
+</tbody>
+</table>
+<p><strong>HTTP Status Code (গুরুত্বপূর্ণ শ্রেণি):</strong></p>
+<ul>
+<li><strong>2xx — সফল:</strong> 200 OK, 201 Created</li>
+<li><strong>3xx — রিডাইরেক্ট:</strong> 301 Moved Permanently, 304 Not Modified</li>
+<li><strong>4xx — Client-এর ভুল:</strong> 400 Bad Request, 401 Unauthorized, 404 Not Found</li>
+<li><strong>5xx — Server-এর ভুল:</strong> 500 Internal Server Error, 503 Service Unavailable</li>
+</ul>
+<p><strong>একটি HTTP Request-এর গঠন:</strong><br />
+- <strong>Method + URL</strong> (যেমন <code>GET /users/123</code>)<br />
+- <strong>Headers</strong> (যেমন <code>Authorization</code>, <code>Content-Type</code>)<br />
+- <strong>Body</strong> (POST/PUT-এ ডাটা থাকে)</p>
+<h3>৩.৪ REST API (রেস্ট এপিআই)</h3>
+<p><strong>REST (Representational State Transfer)</strong> হলো API ডিজাইনের একটি স্থাপত্য শৈলী, যা HTTP-এর ওপর ভিত্তি করে গড়া। REST অনুসরণকারী API-কে বলা হয় <strong>RESTful API</strong>।</p>
+<p><strong>REST-এর মূল নীতি:</strong></p>
+<ul>
+<li><strong>Resource-ভিত্তিক:</strong> সবকিছুকে "resource" হিসেবে দেখা হয় (user, order, product) এবং প্রতিটির একটি URL থাকে।</li>
+<li><strong>HTTP Method ব্যবহার:</strong> কাজের ধরন বোঝাতে method ব্যবহার (GET পড়া, POST তৈরি)।</li>
+<li><strong>Stateless:</strong> প্রতিটি অনুরোধ সম্পূর্ণ তথ্য বহন করে; Server সেশন মনে রাখে না।</li>
+<li><strong>JSON ফরম্যাট:</strong> সাধারণত ডাটা আদান-প্রদান হয় JSON-এ।</li>
+</ul>
+<p><strong>ভালো REST Endpoint ডিজাইন:</strong></p>
+<pre><code>GET    /users          → সব ব্যবহারকারীর তালিকা
+GET    /users/123      → নির্দিষ্ট ব্যবহারকারী
+POST   /users          → নতুন ব্যবহারকারী তৈরি
+PUT    /users/123      → ব্যবহারকারী আপডেট
+DELETE /users/123      → ব্যবহারকারী মুছে ফেলা
+GET    /users/123/orders → ঐ ব্যবহারকারীর অর্ডার
+</code></pre>
+<blockquote>
+<p><strong>নিয়ম:</strong> URL-এ noun (বিশেষ্য) ব্যবহার করুন, verb (ক্রিয়া) নয়। <code>/getUser</code> খারাপ; <code>GET /users/123</code> ভালো — কারণ কাজটি method-ই বলে দেয়।</p>
+</blockquote>
+<hr />
+<h2>৪. বাস্তব সমস্যা (Real-World Problem Statement)</h2>
+<p>ধরুন আপনি একটি মোবাইল অ্যাপ আর একটি ওয়েবসাইট একসাথে বানাচ্ছেন — দুটোই একই ব্যবহারকারীর ডাটা দেখাবে। আপনি কি দুটোতে আলাদাভাবে ডাটাবেস লজিক লিখবেন?</p>
+<p>না। আপনি একটি <strong>REST API</strong> বানাবেন যা ব্যবসায়িক যুক্তি ও ডাটা সামলায়, আর ওয়েব ও মোবাইল উভয়ই সেই একই API-কে অনুরোধ পাঠাবে। এটিই 3-Tier ও Client-Server-এর বাস্তব শক্তি:</p>
+<ul>
+<li><strong>একবার লিখুন, সবখানে ব্যবহার করুন</strong> — একই API ওয়েব, মোবাইল, এমনকি তৃতীয় পক্ষের জন্যও।</li>
+<li><strong>স্বাধীন পরিবর্তন</strong> — Backend বদলালেও Frontend অপরিবর্তিত থাকে যদি API চুক্তি (contract) একই থাকে।</li>
+</ul>
+<p>API ছাড়া প্রতিটি প্ল্যাটফর্মে আলাদা কোড লিখতে হতো — যা রক্ষণাবেক্ষণ দুঃস্বপ্নে পরিণত হতো।</p>
+<hr />
+<h2>৫. ভিজ্যুয়াল আর্কিটেকচার ডায়াগ্রাম (Visual Architecture Diagrams)</h2>
+<h3>Client-Server ও 3-Tier</h3>
+<pre><code>   PRESENTATION TIER       APPLICATION TIER        DATA TIER
+   +---------------+       +----------------+      +-----------+
+   |  Web Browser  |       |                |      |           |
+   |  Mobile App   |  --&gt;  |  Backend API   | --&gt;  | Database  |
+   |   (Client)    | &lt;--   | (Business      | &lt;--  |           |
+   +---------------+ HTTP  |  Logic)        |      +-----------+
+                          +----------------+
+</code></pre>
+<h3>Mermaid: একটি REST অনুরোধের জীবনচক্র</h3>
+<div class="mermaid">sequenceDiagram
+    participant C as Client (Browser)
+    participant S as Server (API)
+    participant DB as Database
+    C->>S: GET /users/123 (HTTP Request)
+    S->>DB: SELECT * FROM users WHERE id=123
+    DB-->>S: User Data
+    S-->>C: 200 OK + JSON Body</div>
+<p><strong>ডায়াগ্রাম ব্যাখ্যা:</strong></p>
+<ul>
+<li><strong>Components:</strong> Client (Presentation), API Server (Application), Database (Data) — তিনটি স্তর।</li>
+<li><strong>Request Flow:</strong> Client <code>GET /users/123</code> পাঠায় → Server ডাটাবেসে query করে → ডাটা পেয়ে JSON হিসেবে ফেরত দেয় → <code>200 OK</code>।</li>
+<li><strong>Failure Points:</strong> ব্যবহারকারী না থাকলে Server <code>404 Not Found</code>; ডাটাবেস ডাউন থাকলে <code>503</code>।</li>
+<li><strong>Scaling:</strong> প্রতিটি স্তর আলাদাভাবে scale করা যায় — যেমন একাধিক API Server-এর সামনে Load Balancer বসানো (অধ্যায় ২)।</li>
+</ul>
+<hr />
+<h2>৬. ইমপ্লিমেন্টেশন উদাহরণ (Implementation Examples)</h2>
+<h3>একটি REST API (Node.js / Express)</h3>
+<pre><code class="language-javascript">const express = require('express');
+const app = express();
+app.use(express.json());  // JSON body পড়ার জন্য
+
+// GET — ব্যবহারকারী পড়া (read)
+app.get('/users/:id', (req, res) =&gt; {
+  const user = { id: req.params.id, name: 'Karim' };
+  res.status(200).json(user);   // 200 OK + JSON
+});
+
+// POST — নতুন ব্যবহারকারী তৈরি (create)
+app.post('/users', (req, res) =&gt; {
+  const newUser = req.body;     // Client-এর পাঠানো ডাটা
+  // ... ডাটাবেসে সংরক্ষণ ...
+  res.status(201).json(newUser); // 201 Created
+});
+
+// DELETE — মুছে ফেলা
+app.delete('/users/:id', (req, res) =&gt; {
+  // ... ডাটাবেস থেকে মুছুন ...
+  res.status(204).send();        // 204 No Content
+});
+
+app.listen(3000);
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong><br />
+- প্রতিটি route একটি resource (<code>/users</code>) ও একটি HTTP method-এর সমন্বয়।<br />
+- <code>res.status(...)</code> দিয়ে সঠিক status code পাঠানো হচ্ছে — <code>201</code> তৈরি, <code>204</code> মুছে ফেলা।<br />
+- API <strong>stateless</strong> — প্রতিটি অনুরোধে প্রয়োজনীয় সব তথ্য (যেমন <code>:id</code>) থাকে।</p>
+<p><strong>সীমাবদ্ধতা:</strong> এখানে authentication নেই; প্রোডাকশনে প্রতিটি অনুরোধে <code>Authorization</code> header যাচাই করতে হবে এবং ভুল ইনপুটে <code>400</code> ফেরত দিতে হবে।</p>
+<h3>সরল HTTP Client (Python)</h3>
+<pre><code class="language-python">import requests
+
+# Server-এ GET অনুরোধ পাঠানো
+response = requests.get(&quot;https://api.example.com/users/123&quot;)
+
+print(response.status_code)   # 200
+print(response.json())        # {'id': 123, 'name': 'Karim'}
+</code></pre>
+<p><strong>ব্যাখ্যা:</strong> এটি Client-এর ভূমিকা দেখায় — অনুরোধ পাঠানো ও উত্তর গ্রহণ করা। <code>status_code</code> দিয়ে সফলতা যাচাই করা হয়।</p>
+<hr />
+<h2>৭. ইন্ডাস্ট্রি কেস স্টাডি (Industry Case Studies)</h2>
+<ul>
+<li><strong>Twitter/X:</strong> তাদের পাবলিক REST API তৃতীয় পক্ষের ডেভেলপারদের টুইট পড়া/পোস্ট করার সুযোগ দেয় — একই backend, বহু Client।</li>
+<li><strong>Stripe (পেমেন্ট):</strong> ইন্ডাস্ট্রির সবচেয়ে প্রশংসিত REST API-এর একটি; পরিষ্কার resource-ভিত্তিক endpoint ও নির্ভরযোগ্য status code-এর জন্য বিখ্যাত।</li>
+<li><strong>Amazon:</strong> তাদের প্রতিটি অভ্যন্তরীণ টিম API-এর মাধ্যমে যোগাযোগ করে (বিখ্যাত "Bezos API Mandate") — এটিই পরে microservices সংস্কৃতির ভিত্তি হয়।</li>
+<li><strong>GitHub:</strong> সম্পূর্ণ প্ল্যাটফর্ম একটি well-documented REST (ও পরে GraphQL) API-এর ওপর দাঁড়িয়ে।</li>
+</ul>
+<hr />
+<h2>৮. সাধারণ ভুল (Common Mistakes)</h2>
+<p><strong>Beginner Mistakes:</strong><br />
+- URL-এ verb ব্যবহার (<code>/createUser</code>) — REST নীতির বিরুদ্ধে।<br />
+- সব ক্ষেত্রে <code>200 OK</code> ফেরত দেওয়া, এমনকি ত্রুটিতেও।</p>
+<p><strong>Intermediate Mistakes:</strong><br />
+- GET অনুরোধে ডাটা পরিবর্তন করা (GET হওয়া উচিত শুধু read, side-effect ছাড়া)।<br />
+- ভুল status code (ব্যবহারকারী না পেয়েও <code>200</code> দেওয়া, <code>404</code>-এর বদলে)।</p>
+<p><strong>Production Mistakes:</strong><br />
+- Stateless নীতি ভেঙে Server-এ সেশন স্টেট রাখা — যা horizontal scaling কঠিন করে।<br />
+- API versioning না রাখা (<code>/v1/users</code>) — ফলে পরিবর্তনে পুরোনো Client ভেঙে পড়ে।</p>
+<p><strong>Scalability Mistakes:</strong><br />
+- Server-side session ব্যবহার করা, যা একাধিক সার্ভারে ভাগ করা কঠিন করে।</p>
+<p><strong>Architecture Mistakes:</strong><br />
+- Presentation Tier-এ business logic মিশিয়ে ফেলা — স্তর বিভাজনের উদ্দেশ্য নষ্ট হয়।</p>
+<hr />
+<h2>৯. ইন্টারভিউ দৃষ্টিভঙ্গি (Interview Perspective)</h2>
+<p><strong>Beginner প্রশ্ন:</strong> <em>HTTP-তে GET আর POST-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>GET তথ্য পড়ে এবং side-effect থাকে না; POST নতুন তথ্য তৈরি করে এবং body-তে ডাটা বহন করে।</p>
+</blockquote>
+<p><strong>Intermediate প্রশ্ন:</strong> <em>REST API "stateless" বলতে কী বোঝায়?</em></p>
+<blockquote>
+<p>প্রতিটি অনুরোধ স্বাধীন ও সম্পূর্ণ — Server আগের অনুরোধের কোনো অবস্থা মনে রাখে না। এটি horizontal scaling সহজ করে, কারণ যেকোনো সার্ভার যেকোনো অনুরোধ সামলাতে পারে।</p>
+</blockquote>
+<p><strong>Advanced প্রশ্ন:</strong> <em>PUT আর PATCH-এর পার্থক্য কী?</em></p>
+<blockquote>
+<p>PUT সম্পূর্ণ resource প্রতিস্থাপন করে (idempotent); PATCH শুধু নির্দিষ্ট অংশ আপডেট করে। যেমন শুধু ইমেইল বদলাতে PATCH উপযুক্ত।</p>
+</blockquote>
+<p><strong>System Design প্রশ্ন:</strong> <em>একটি ব্লগ প্ল্যাটফর্মের জন্য REST API endpoint ডিজাইন করুন।</em></p>
+<blockquote>
+<p>Resource-ভিত্তিক: <code>GET /posts</code>, <code>POST /posts</code>, <code>GET /posts/{id}</code>, <code>PUT /posts/{id}</code>, <code>DELETE /posts/{id}</code>, এবং নেস্টেড সম্পর্কের জন্য <code>GET /posts/{id}/comments</code>, <code>POST /posts/{id}/comments</code>। সঠিক status code ও <code>/v1/</code> versioning যুক্ত করুন।</p>
+</blockquote>
+<hr />
+<h2>১০. সেরা চর্চা (Best Practices)</h2>
+<ul>
+<li><strong>Resource-ভিত্তিক URL ব্যবহার করুন</strong> — noun, verb নয়; বহুবচন (<code>/users</code>)।</li>
+<li><strong>সঠিক HTTP method ও status code</strong> ব্যবহার করুন।</li>
+<li><strong>API versioning রাখুন</strong> (<code>/v1/</code>) যাতে ভবিষ্যৎ পরিবর্তনে পুরোনো Client না ভাঙে।</li>
+<li><strong>Stateless রাখুন</strong> — সেশন স্টেট Server-এ নয়, token (যেমন JWT) বা Client-এ রাখুন।</li>
+<li><strong>নিরাপত্তা:</strong> প্রতিটি অনুরোধে authentication যাচাই করুন; HTTPS ব্যবহার করুন।</li>
+<li><strong>পরিষ্কার error response দিন</strong> — ত্রুটির কারণসহ JSON বার্তা।</li>
+</ul>
+<hr />
+<h2>১১. অধ্যায় সারসংক্ষেপ (Chapter Summary)</h2>
+<p><strong>মূল শেখা:</strong><br />
+- <strong>Client-Server Model</strong> = Client অনুরোধ পাঠায়, Server প্রক্রিয়া করে উত্তর দেয়।<br />
+- <strong>3-Tier Architecture</strong> = Presentation, Application (Logic), Data — তিনটি স্বাধীন স্তর।<br />
+- <strong>HTTP</strong> = ওয়েবের stateless request-response প্রোটোকল; Method (GET/POST/PUT/DELETE) ও Status Code (2xx/4xx/5xx)।<br />
+- <strong>REST API</strong> = resource-ভিত্তিক, stateless, HTTP method-নির্ভর API ডিজাইন শৈলী; সাধারণত JSON।</p>
+<p><strong>গুরুত্বপূর্ণ পরিভাষা:</strong> Client, Server, Tier, HTTP, Stateless, Method, Status Code, Resource, REST, Endpoint, JSON, Idempotent, Versioning।</p>
+<hr />
+<h2>১২. অনুশীলন (Practice Exercises)</h2>
+<p><strong>Conceptual:</strong><br />
+1. 3-Tier Architecture-এর তিনটি স্তরের দায়িত্ব নিজের ভাষায় লিখুন।<br />
+2. কেন REST API stateless হওয়া scaling-এর জন্য সুবিধাজনক?</p>
+<p><strong>Practical:</strong><br />
+3. নিচের কাজগুলোর জন্য সঠিক HTTP method ও status code লিখুন: (ক) নতুন পণ্য তৈরি (খ) পণ্য মুছে ফেলা (গ) অনুপস্থিত পণ্য খোঁজা।<br />
+4. উপরের Express কোডে একটি <code>PATCH /users/:id</code> endpoint যোগ করুন।</p>
+<p><strong>Architecture Design:</strong><br />
+5. একটি ই-কমার্স অ্যাপের জন্য <code>product</code> ও <code>order</code> resource-এর সম্পূর্ণ REST endpoint তালিকা ডিজাইন করুন।</p>
+<p><strong>Scenario-Based:</strong><br />
+6. আপনার API দুটি সার্ভারে চলছে, কিন্তু লগইন করা ব্যবহারকারীরা মাঝে মাঝে "logged out" হয়ে যাচ্ছেন। সম্ভাব্য কারণ কী হতে পারে এবং সমাধান কী? (ইঙ্গিত: stateless)</p>
+<p><strong>Interview Challenge:</strong><br />
+7. একজন ইন্টারভিউয়ারকে বোঝান কেন <code>GET /deleteUser/5</code> একটি খারাপ ডিজাইন এবং সঠিক বিকল্প কী।</p>
+<hr />
+<p><strong>অধ্যায় ৩ সম্পন্ন হয়েছে।</strong></p>
+    </div>
+
+  </div>
+
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Mobile menu toggle
+  var btn = document.getElementById('menuBtn');
+  var sidebar = document.querySelector('.sidebar');
+  if (btn && sidebar) {
+    btn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (!sidebar.contains(e.target) && e.target !== btn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    document.querySelectorAll('pre code:not(.language-mermaid)').forEach(function (el) {
+      hljs.highlightElement(el);
+    });
+  }
+
+  // Mermaid
+  if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    document.querySelectorAll('.mermaid').forEach(function (el) {
+      mermaid.run({ nodes: [el] }).catch(function (e) {
+        el.innerHTML = '<em style="color:#ef4444">Diagram rendering requires a server (open via http://)</em>';
+      });
+    });
+  }
+
+  // Active sidebar item scroll into view
+  var active = document.querySelector('.chapter-list .active');
+  if (active) {
+    active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+});
+</script>
+</body>
+</html>
